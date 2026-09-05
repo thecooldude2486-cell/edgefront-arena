@@ -1,0 +1,35 @@
+name: Test Game Build
+
+on:
+  push:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build game
+        run: npm run build
+
+      - name: Show build output
+        run: |
+          echo "===== PROJECT FILES AFTER BUILD ====="
+          find . -maxdepth 3 -type d | sort
+
+          echo "===== INDEX.HTML FILES ====="
+          find . -name "index.html" -print
