@@ -13,6 +13,8 @@ const { d1, r2 } = hostingConfig;
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === 'seatbelt';
 
 const localBindingConfig = {
+  name: 'edgefront-arena',
+  workers_dev: true,
   main: 'vinext/server/fetch-handler',
   compatibility_flags: ['nodejs_compat'],
 
@@ -47,9 +49,6 @@ export default defineConfig(async () => {
   const { cloudflare } = await import('@cloudflare/vite-plugin');
 
   return {
-    // GitHub Pages repository path
-    base: '/edgefront-arena/',
-
     css: {
       postcss: {
         plugins: [tailwindcss()],
