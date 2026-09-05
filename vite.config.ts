@@ -15,6 +15,7 @@ const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === 'seatbelt';
 const localBindingConfig = {
   main: 'vinext/server/fetch-handler',
   compatibility_flags: ['nodejs_compat'],
+
   d1_databases: d1
     ? [
         {
@@ -24,6 +25,7 @@ const localBindingConfig = {
         },
       ]
     : [],
+
   r2_buckets: r2
     ? [
         {
@@ -45,15 +47,34 @@ export default defineConfig(async () => {
   const { cloudflare } = await import('@cloudflare/vite-plugin');
 
   return {
-    css: { postcss: { plugins: [tailwindcss()] } },
+    // GitHub Pages repository path
+    base: '/edgefront-arena/',
+
+    css: {
+      postcss: {
+        plugins: [tailwindcss()],
+      },
+    },
+
     server: isCodexSeatbeltSandbox
-      ? { watch: { useFsEvents: false, usePolling: true } }
+      ? {
+          watch: {
+            useFsEvents: false,
+            usePolling: true,
+          },
+        }
       : undefined,
+
     plugins: [
       vinext(),
       sites(),
+
       cloudflare({
-        viteEnvironment: { name: 'rsc', childEnvironments: ['ssr'] },
+        viteEnvironment: {
+          name: 'rsc',
+          childEnvironments: ['ssr'],
+        },
+
         config: localBindingConfig,
       }),
     ],
