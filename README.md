@@ -24,6 +24,7 @@ Open `http://localhost:3000` in a normal desktop web browser. Press `Control + C
 - `Space` — jump
 - Double-tap `W`, then hold the second press to sprint; release to stop
 - Press `C` or `Ctrl` to toggle crouching; press again to stand
+- Hold `Shift` to slide on the ground, even from a standstill. The initial boost fades over 0.65 seconds; release to stop. There is no cooldown, so you can slide again immediately. When standing still, you slide forward in the direction you face.
 - `Esc` — release the cursor and pause
 
 ## Main files, in plain language
@@ -32,6 +33,7 @@ Open `http://localhost:3000` in a normal desktop web browser. Press `Control + C
 - `app/globals.css` controls the menus, HUD, colours, and layout.
 - `components/GameShell.tsx` connects the 3D game to the React menus and HUD.
 - `game/createGame.ts` starts Babylon.js and joins all game systems together.
+- `game/createSlide.ts` controls the slide boost, duration, cooldown, and camera tilt settings.
 - `game/createArena.ts` builds the arena floor, walls, cover, ramps, and platforms.
 - `game/createWeapon.ts` creates the Kestrel AR, shooting, recoil, ammo, reload, flash, and sound.
 - `game/createBot.ts` creates the Rook rival and its simple movement and shooting AI.

@@ -1,6 +1,5 @@
 import {
   Color3,
-  DynamicTexture,
   Mesh,
   MeshBuilder,
   Scene,
@@ -85,62 +84,13 @@ export function createArena(scene: Scene) {
   glass.alpha = 0.22;
   glass.backFaceCulling = false;
 
-  // One shared live texture keeps every physical scoreboard in sync with the
-  // same match score used by the HUD.
-  const scoreTexture = new DynamicTexture(
-    'live arena score texture',
-    { width: 1024, height: 256 },
-    scene,
-    false,
-  );
-  const scoreMaterial = new StandardMaterial('live arena score material', scene);
-  scoreMaterial.diffuseTexture = scoreTexture;
-  scoreMaterial.emissiveTexture = scoreTexture;
+  // Scoreboards are decorative solid panels, with no text or score textures.
+  const scoreMaterial = new StandardMaterial('blank scoreboard screen', scene);
+  scoreMaterial.emissiveColor = Color3.FromHexString('#03111b');
+  scoreMaterial.diffuseColor = Color3.Black();
   scoreMaterial.disableLighting = true;
   scoreMaterial.specularColor = Color3.Black();
-
-  function updateScore(playerScore: number, botScore: number) {
-    const context = scoreTexture.getContext() as CanvasRenderingContext2D;
-    context.fillStyle = '#03111b';
-    context.fillRect(0, 0, 1024, 256);
-
-    // Team-colour rails, inset panels, and scan lines create a clean
-    // futuristic display without needing an external image asset.
-    context.fillStyle = '#35d5ea';
-    context.fillRect(0, 0, 502, 12);
-    context.fillStyle = '#ff716b';
-    context.fillRect(522, 0, 502, 12);
-    context.fillStyle = '#082431';
-    context.fillRect(26, 62, 462, 165);
-    context.fillStyle = '#231923';
-    context.fillRect(536, 62, 462, 165);
-    context.fillStyle = 'rgba(120, 226, 241, 0.08)';
-    for (let y = 68; y < 226; y += 18) context.fillRect(26, y, 972, 2);
-
-    context.textAlign = 'center';
-    context.textBaseline = 'middle';
-    context.font = '700 30px monospace';
-    context.fillStyle = '#a9c4cf';
-    context.fillText('EDGEFRONT // LIVE ROUND', 512, 37);
-    context.font = '700 24px monospace';
-    context.fillStyle = '#63e9fa';
-    context.fillText('YOU', 252, 86);
-    context.fillStyle = '#ff8a83';
-    context.fillText('ROOK', 772, 86);
-    context.font = '900 112px monospace';
-    context.fillStyle = '#e8fbff';
-    context.fillText(String(playerScore), 252, 162);
-    context.fillText(String(botScore), 772, 162);
-    context.font = '900 54px monospace';
-    context.fillStyle = '#b8fb64';
-    context.fillText('—', 512, 158);
-    context.font = '700 20px monospace';
-    context.fillStyle = '#91aab5';
-    context.fillText('FIRST TO 5', 512, 222);
-    scoreTexture.update(false);
-  }
-
-  updateScore(0, 0);
+  const scoreMeshes: Mesh[] = [];
 
   // A wide foundation makes the arena feel like one intentional structure.
   arenaBox(
@@ -585,36 +535,30 @@ export function createArena(scene: Scene) {
       { width: 14, height: 3.25, depth: 0.5 },
       concrete,
     );
-    decorativeBox(
+    const blankScreen = decorativeBox(
       scene,
       `${side} scoreboard screen`,
       new Vector3(0, 6.35, side * 20.76),
       { width: 12.5, height: 2.1, depth: 0.08 },
-      dark,
+      scoreMaterial,
     );
-    const liveScore = MeshBuilder.CreatePlane(
-      `${side} live scoreboard`,
-      { width: 12.15, height: 1.92, sideOrientation: Mesh.DOUBLESIDE },
-      scene,
-    );
-    liveScore.position = new Vector3(0, 6.35, side * 20.65);
-    liveScore.material = scoreMaterial;
-    liveScore.isPickable = false;
+    scoreMeshes.push(blankScreen);
     decorativeBox(
       scene,
-      `${side} scoreboard centre line`,
-      new Vector3(0, 6.35, side * 20.7),
+      `${side} scoreboard centre trim`,
+      new Vector3(0, 6.35, side * 20.65),
       { width: 0.18, height: 1.55, depth: 0.07 },
       lime,
     );
     decorativeBox(
       scene,
-      `${side} scoreboard team bar`,
-      new Vector3(side * 3.1, 6.35, side * 20.68),
+      `${side} scoreboard team accent`,
+      new Vector3(side * 3.1, 6.35, side * 20.65),
       { width: 4.7, height: 0.18, depth: 0.07 },
       teamSurface,
     );
 
+    // Restore the original stadium banners as decorative frames.
     for (const x of [-20, -16, 16, 20]) {
       decorativeBox(
         scene,
@@ -675,6 +619,23 @@ export function createArena(scene: Scene) {
       { width, height: 1.25, depth },
       x + z < 0 ? cyan : coral,
     );
+    // Blank inset inside the original coloured frame. No text texture.
+    const blankPanel = decorativeBox(
+      scene,
+      `overhead blank screen ${x} ${z}`,
+      new Vector3(
+        x === 0 ? 0 : Math.sign(x) * 2.62,
+        10.2,
+        z === 0 ? 0 : Math.sign(z) * 2.62,
+      ),
+      {
+        width: x === 0 ? 3.55 : 0.04,
+        height: 1.08,
+        depth: z === 0 ? 3.55 : 0.04,
+      },
+      scoreMaterial,
+    );
+    scoreMeshes.push(blankPanel);
   }
   decorativeBox(
     scene,
@@ -684,26 +645,8 @@ export function createArena(scene: Scene) {
     lime,
   );
 
-  // The hanging display uses the same live score texture on all four faces.
-  for (const [x, z, rotationY] of [
-    [0, -2.57, 0],
-    [0, 2.57, Math.PI],
-    [-2.57, 0, Math.PI / 2],
-    [2.57, 0, -Math.PI / 2],
-  ] as const) {
-    const livePanel = MeshBuilder.CreatePlane(
-      `overhead live score ${x} ${z}`,
-      { width: 3.55, height: 1.08, sideOrientation: Mesh.DOUBLESIDE },
-      scene,
-    );
-    livePanel.position = new Vector3(x, 10.2, z);
-    livePanel.rotation.y = rotationY;
-    livePanel.material = scoreMaterial;
-    livePanel.isPickable = false;
-  }
-
   return {
-    updateScore,
+    scoreMeshes,
     materials: {
       dark,
       floor,

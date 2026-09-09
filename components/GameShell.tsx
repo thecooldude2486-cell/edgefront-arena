@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { GameHudState } from '@/game/types';
 import type { WeaponId } from '@/game/weaponDefinitions';
+import { WeaponShop } from './WeaponShop';
 
 const initialHud: GameHudState = {
   weaponId: 'assaultRifle',
@@ -38,6 +39,7 @@ export function GameShell() {
     'loading',
   );
   const [started, setStarted] = useState(false);
+  const [shopOpen, setShopOpen] = useState(false);
   const [error, setError] = useState('');
   const [hud, setHud] = useState(initialHud);
 
@@ -96,7 +98,6 @@ export function GameShell() {
         aria-label="Edgefront Arena game"
       />
       <div className="brand-mark">Edgefront</div>
-      <div className="stage-label">First to 5</div>
 
       {started && (
         <div className="combat-hud" aria-live="polite">
@@ -107,34 +108,6 @@ export function GameShell() {
               aria-hidden="true"
             />
           )}
-          <div className="scoreboard">
-            <div
-              key={`player-score-${hud.playerScore}`}
-              className={`score-side player-side ${hud.playerScore > 0 ? 'score-won-round' : ''}`}
-            >
-              <span>You</span>
-              <strong
-                className={hud.playerScore > 0 ? 'score-number-earned' : ''}
-              >
-                {hud.playerScore}
-              </strong>
-            </div>
-            <div className="score-goal">
-              <span>First to</span>
-              <strong>5</strong>
-            </div>
-            <div
-              key={`bot-score-${hud.botScore}`}
-              className={`score-side bot-side ${hud.botScore > 0 ? 'score-won-round' : ''}`}
-            >
-              <strong
-                className={hud.botScore > 0 ? 'score-number-earned' : ''}
-              >
-                {hud.botScore}
-              </strong>
-              <span>Rook</span>
-            </div>
-          </div>
           <div className="crosshair" aria-hidden="true">
             <i />
             <i />
@@ -245,6 +218,7 @@ export function GameShell() {
             <section className="pause-screen" aria-labelledby="pause-title">
               <p>Match paused</p>
               <h2 id="pause-title">Cursor released</h2>
+              <button className="shop-open-button" type="button" onClick={() => setShopOpen(true)}>Weapon shop</button>
               <button
                 className="primary-button"
                 type="button"
@@ -263,10 +237,6 @@ export function GameShell() {
               <h2 id="match-result-title">
                 {hud.result === 'victory' ? 'Victory' : 'Defeat'}
               </h2>
-              <div className="final-score">
-                <span>You {hud.playerScore}</span>
-                <i /> <span>{hud.botScore} Rook</span>
-              </div>
               <button
                 className="primary-button"
                 type="button"
@@ -316,6 +286,9 @@ export function GameShell() {
                 <kbd>C / Ctrl Toggle</kbd> Crouch
               </span>
               <span className="control-chip">
+                <kbd>Hold Shift</kbd> Slide from standing or moving · No cooldown
+              </span>
+              <span className="control-chip">
                 <kbd>Space</kbd> Jump
               </span>
               <span className="control-chip">
@@ -338,11 +311,13 @@ export function GameShell() {
               <p className="loading-line">Calibrating the arena renderer…</p>
             )}
             {status === 'error' && <p className="error-message">{error}</p>}
+            <button className="shop-open-button" type="button" onClick={() => setShopOpen(true)}>Weapon shop</button>
           </div>
         </section>
       )}
 
-      {started && <div className="pause-hint">ESC releases your mouse</div>}
+      <WeaponShop open={shopOpen} onOpenChange={setShopOpen} />
+      {started && <div className="pause-hint">ESC releases your mouse · Weapon shop in pause menu</div>}
     </main>
   );
 }

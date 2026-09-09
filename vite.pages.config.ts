@@ -8,6 +8,8 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   base: '/edgefront-arena/',
   plugins: [react()],
+  // File-system events can be blocked in the desktop preview sandbox.
+  server: { watch: { usePolling: true } },
   resolve: {
     alias: { '@': fileURLToPath(new URL('.', import.meta.url)) },
   },

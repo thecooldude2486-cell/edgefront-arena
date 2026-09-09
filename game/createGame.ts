@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import {
   Color3,
   Color4,
@@ -34,6 +35,14 @@ import { createHealthRegeneration } from './createHealthRegeneration';
 import { createWeapon } from './createWeapon';
 import type { GameHudUpdate } from './types';
 import { createBot } from './createBot';
+import { createSlide, SLIDE } from './createSlide';
+
+// React refresh preserves the running Babylon scene. Rebuild the page when
+// a game module changes so removed meshes/textures cannot remain on screen.
+// Vite removes this development-only branch from production builds.
+if (import.meta.hot) {
+  import.meta.hot.accept(() => window.location.reload());
+}
 
 export function createGame(
   canvas: HTMLCanvasElement,
@@ -108,6 +117,8 @@ export function createGame(
   glow.intensity = 0.36;
 
   const arena = createArena(scene);
+  // Keep the empty scoreboard screens free of stadium glow.
+  arena.scoreMeshes.forEach((mesh) => glow.addExcludedMesh(mesh));
   const playerCollider = MeshBuilder.CreateCapsule(
     'player movement collider',
     { height: PLAYER.colliderHalfHeight * 2, radius: 0.42, tessellation: 10 },
@@ -136,6 +147,7 @@ export function createGame(
   let crouchToggled = false;
   let lastForwardPressAt = -Infinity;
   let sprintArmed = false;
+  const slide = createSlide();
 
   function resetPlayerPosition() {
     playerCollider.position.set(
@@ -152,6 +164,8 @@ export function createGame(
     crouchToggled = false;
     lastForwardPressAt = -Infinity;
     sprintArmed = false;
+    slide.reset();
+    jumpQueued = false;
   }
 
   let playerHealth = PLAYER.maxHealth;
@@ -233,7 +247,6 @@ export function createGame(
 
     playerAlive = false;
     botScore += 1;
-    arena.updateScore(playerScore, botScore);
     weapon?.setActive(false);
     camera.detachControl();
     onHudUpdate({ dead: true, roundWon: false, botScore, paused: false });
@@ -266,7 +279,6 @@ export function createGame(
     onEliminated: () => {
       if (gameOver) return;
       playerScore += 1;
-      arena.updateScore(playerScore, botScore);
       if (playerScore >= MATCH.scoreToWin) {
         onHudUpdate({ playerScore });
         endMatch('victory');
@@ -359,6 +371,13 @@ export function createGame(
   const onKeyDown = (event: KeyboardEvent) => {
     pressed.add(event.code);
     if (
+      (event.code === 'ShiftLeft' || event.code === 'ShiftRight') &&
+      !event.repeat && matchActive && playerAlive && !gameOver &&
+      document.pointerLockElement === canvas
+    ) {
+      event.preventDefault();
+    }
+    if (
       event.code === 'KeyW' &&
       !event.repeat &&
       matchActive &&
@@ -383,6 +402,7 @@ export function createGame(
       document.pointerLockElement === canvas
     ) {
       event.preventDefault();
+      slide.cancel();
       crouchToggled = !crouchToggled;
     }
     if (event.code === 'Space' && !event.repeat) {
@@ -401,6 +421,13 @@ export function createGame(
   };
   const onPointerLockChange = () => {
     const locked = document.pointerLockElement === canvas;
+    if (!locked) {
+      slide.cancel();
+      jumpQueued = false;
+      pressed.clear();
+      sprintArmed = false;
+      camera.rotation.z = 0;
+    }
     if (locked) {
       camera.attachControl(canvas, true);
       onHudUpdate({ paused: false });
@@ -443,6 +470,11 @@ export function createGame(
       !gameOver &&
       document.pointerLockElement === canvas;
 
+    const holdingSlide = canMove &&
+      (pressed.has('ShiftLeft') || pressed.has('ShiftRight'));
+    slide.update(deltaSeconds, holdingSlide);
+    if (!canMove || !grounded) slide.cancel();
+
     let inputX = 0;
     let inputZ = 0;
     if (canMove) {
@@ -453,7 +485,22 @@ export function createGame(
     }
 
     const hasMovementInput = inputX !== 0 || inputZ !== 0;
-    const crouching = canMove && crouchToggled;
+    // Capture the slide direction once, so mouse aiming doesn't steer the boost.
+    if (holdingSlide) {
+      const yaw = camera.rotation.y;
+      // Standing still: slide forward. WASD can select another direction.
+      const slideInputX = hasMovementInput ? inputX : 0;
+      const slideInputZ = hasMovementInput ? inputZ : 1;
+      if (slide.tryStart(
+        Math.sin(yaw) * slideInputZ + Math.cos(yaw) * slideInputX,
+        Math.cos(yaw) * slideInputZ - Math.sin(yaw) * slideInputX,
+        grounded,
+      )) {
+        crouchToggled = false;
+      }
+    }
+    if (jumpQueued && grounded && canMove) slide.cancel();
+    const crouching = canMove && (crouchToggled || slide.active);
     // Double-tap W, then hold the second press, to sprint.
     // Crouching always overrides sprint, even while W remains held.
     const sprinting =
@@ -490,6 +537,13 @@ export function createGame(
       desiredVelocity,
       movementBlend,
     );
+    if (slide.active) {
+      horizontalVelocity.set(
+        slide.direction.x * slide.speed,
+        0,
+        slide.direction.z * slide.speed,
+      );
+    }
 
     if (jumpQueued && grounded && canMove) {
       verticalVelocity = PLAYER.jumpSpeed;
@@ -501,6 +555,7 @@ export function createGame(
       verticalVelocity + PLAYER.gravity * deltaSeconds,
     );
 
+    const positionBeforeMove = playerCollider.position.clone();
     playerCollider.moveWithCollisions(
       new Vector3(
         horizontalVelocity.x * deltaSeconds,
@@ -508,6 +563,13 @@ export function createGame(
         horizontalVelocity.z * deltaSeconds,
       ),
     );
+
+    if (slide.active) {
+      const travelled = playerCollider.position.subtract(positionBeforeMove);
+      const forwardDistance = travelled.x * slide.direction.x + travelled.z * slide.direction.z;
+      // Stop the boost on a blocking wall instead of pushing against it.
+      if (forwardDistance < slide.speed * deltaSeconds * 0.2) slide.cancel();
+    }
 
     const groundRay = new Ray(
       playerCollider.position,
@@ -520,6 +582,19 @@ export function createGame(
     );
     grounded = verticalVelocity <= 0 && Boolean(groundHit?.hit);
     if (grounded) verticalVelocity = -0.8;
+
+    // Small, smoothed roll: left/right slides lean toward travel; forward
+    // slides get a gentler lean. Looking around updates the relative direction.
+    const sideAmount = slide.direction.x * Math.cos(camera.rotation.y)
+      - slide.direction.z * Math.sin(camera.rotation.y);
+    const forwardAmount = slide.direction.x * Math.sin(camera.rotation.y)
+      + slide.direction.z * Math.cos(camera.rotation.y);
+    const leanDirection = Math.abs(sideAmount) > 0.15
+      ? -sideAmount : Math.sign(forwardAmount) * 0.3;
+    const targetRoll = slide.active
+      ? leanDirection * SLIDE.cameraTilt
+      : 0;
+    camera.rotation.z += (targetRoll - camera.rotation.z) * (1 - Math.exp(-14 * deltaSeconds));
 
     camera.position.copyFrom(playerCollider.position);
     const targetEyeHeight = crouching
@@ -566,7 +641,6 @@ export function createGame(
       playerAlive = true;
       playerScore = 0;
       botScore = 0;
-      arena.updateScore(playerScore, botScore);
       gameOver = false;
       matchActive = true;
       resetPlayerPosition();

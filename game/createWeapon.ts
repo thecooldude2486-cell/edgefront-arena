@@ -83,30 +83,8 @@ function createShotSound() {
   };
 }
 
-export function createWeapon(
-  scene: Scene,
-  camera: UniversalCamera,
-  canvas: HTMLCanvasElement,
-  callbacks: WeaponCallbacks,
-) {
-  const root = new TransformNode('kestrel rifle root', scene);
-  root.parent = camera;
-  root.position = new Vector3(0.46, -0.38, 0.88);
-  root.rotation = new Vector3(-0.02, -0.045, 0);
-  const hipPosition = root.position.clone();
-  const hipRotation = root.rotation.clone();
-  // This position lines the optic up with the centre of the screen.
-  const aimPosition = new Vector3(0, -0.22, 0.56);
-  const aimRotation = Vector3.Zero();
-  const sprintPosition = new Vector3(0.34, -0.5, 0.72);
-  const sprintRotation = new Vector3(0.14, -0.12, 0.08);
-  const pistolHipPosition = new Vector3(0.38, -0.34, 0.72);
-  const pistolHipRotation = new Vector3(-0.015, -0.035, 0);
-  const pistolAimPosition = new Vector3(0, -0.155, 0.5);
-  const pistolAimRotation = Vector3.Zero();
-  const pistolSprintPosition = new Vector3(0.3, -0.46, 0.64);
-  const pistolSprintRotation = new Vector3(0.12, -0.1, 0.07);
-
+// Shared geometry only: the shop reuses these models without shooting or ammo logic.
+export function populateWeaponModels(scene: Scene, root: TransformNode, pistolRoot: TransformNode) {
   const graphite = weaponMaterial(scene, 'kestrel graphite', '#182733');
   const shell = weaponMaterial(scene, 'kestrel pearl shell', '#e9f0f1');
   const metal = weaponMaterial(scene, 'kestrel metal', '#91a4ad');
@@ -240,10 +218,6 @@ export function createWeapon(
   muzzle.isPickable = false;
 
   // Original Vesper Pistol: a compact pearl-and-graphite secondary.
-  const pistolRoot = new TransformNode('vesper pistol root', scene);
-  pistolRoot.parent = camera;
-  pistolRoot.position.copyFrom(pistolHipPosition);
-  pistolRoot.rotation.copyFrom(pistolHipRotation);
 
   function pistolBox(
     name: string,
@@ -300,6 +274,38 @@ export function createWeapon(
   pistolBarrel.rotation.x = Math.PI / 2;
   pistolBarrel.material = dark;
   pistolBarrel.isPickable = false;
+
+}
+
+export function createWeapon(
+  scene: Scene,
+  camera: UniversalCamera,
+  canvas: HTMLCanvasElement,
+  callbacks: WeaponCallbacks,
+) {
+  const root = new TransformNode('kestrel rifle root', scene);
+  root.parent = camera;
+  root.position = new Vector3(0.46, -0.38, 0.88);
+  root.rotation = new Vector3(-0.02, -0.045, 0);
+  const hipPosition = root.position.clone();
+  const hipRotation = root.rotation.clone();
+  // This position lines the optic up with the centre of the screen.
+  const aimPosition = new Vector3(0, -0.22, 0.56);
+  const aimRotation = Vector3.Zero();
+  const sprintPosition = new Vector3(0.34, -0.5, 0.72);
+  const sprintRotation = new Vector3(0.14, -0.12, 0.08);
+  const pistolHipPosition = new Vector3(0.38, -0.34, 0.72);
+  const pistolHipRotation = new Vector3(-0.015, -0.035, 0);
+  const pistolAimPosition = new Vector3(0, -0.155, 0.5);
+  const pistolAimRotation = Vector3.Zero();
+  const pistolSprintPosition = new Vector3(0.3, -0.46, 0.64);
+  const pistolSprintRotation = new Vector3(0.12, -0.1, 0.07);
+
+  const pistolRoot = new TransformNode('vesper pistol root', scene);
+  pistolRoot.parent = camera;
+  pistolRoot.position.copyFrom(pistolHipPosition);
+  pistolRoot.rotation.copyFrom(pistolHipRotation);
+  populateWeaponModels(scene, root, pistolRoot);
   pistolRoot.setEnabled(false);
 
   const flash = MeshBuilder.CreateSphere(
