@@ -1,6 +1,7 @@
 import type { WeaponId } from './weaponDefinitions';
 
 export type GameHudState = {
+  grappleState: import('./createGrapple').GrappleState;
   scoped: boolean;
   weaponId: WeaponId;
   weaponName: string;

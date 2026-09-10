@@ -37,6 +37,7 @@ import { createWeapon } from './createWeapon';
 import type { GameHudUpdate } from './types';
 import { createBot } from './createBot';
 import { createSlide, SLIDE } from './createSlide';
+import { createGrapple } from './createGrapple';
 
 // React refresh preserves the running Babylon scene. Rebuild the page when
 // a game module changes so removed meshes/textures cannot remain on screen.
@@ -153,6 +154,7 @@ export function createGame(
   const slide = createSlide();
 
   function resetPlayerPosition() {
+    grapple.cancel();
     playerCollider.position.set(
       SPAWNS.player.x,
       PLAYER.colliderHalfHeight,
@@ -188,6 +190,12 @@ export function createGame(
   let botScore = 0;
   let matchActive = false;
   let gameOver = false;
+  const grapple = createGrapple(scene, camera, canvas, playerCollider,
+    PLAYER.colliderHalfHeight + .25,
+    () => matchActive && playerAlive && !gameOver && weapon?.id === 'orbiter' && canUseWeapon('orbiter'),
+    (mesh) => mesh.checkCollisions && mesh !== playerCollider && mesh !== bot?.root && mesh.metadata?.owner !== 'bot',
+    (grappleState) => onHudUpdate({ grappleState }));
+  let wasGrappling = false;
   onHudUpdate({
     health: playerHealth,
     maxHealth: MAX_HEALTH,
@@ -476,7 +484,12 @@ export function createGame(
       !gameOver &&
       document.pointerLockElement === canvas;
 
-    const holdingSlide = canMove &&
+    const grappleVelocity = grapple.update(deltaSeconds);
+    if (wasGrappling && !grapple.active) { horizontalVelocity.setAll(0); verticalVelocity = 0; }
+    wasGrappling = grapple.active;
+    if (grapple.active) { slide.cancel(); sprintArmed = false; crouchToggled = false; jumpQueued = false; }
+
+    const holdingSlide = canMove && !grapple.active &&
       (pressed.has('ShiftLeft') || pressed.has('ShiftRight'));
     slide.update(deltaSeconds, holdingSlide);
     if (!canMove || !grounded) slide.cancel();
@@ -561,6 +574,10 @@ export function createGame(
       verticalVelocity + PLAYER.gravity * deltaSeconds,
     );
 
+    if (grappleVelocity) {
+      horizontalVelocity.set(grappleVelocity.x, 0, grappleVelocity.z);
+      verticalVelocity = grappleVelocity.y;
+    }
     const positionBeforeMove = playerCollider.position.clone();
     playerCollider.moveWithCollisions(
       new Vector3(
@@ -616,6 +633,7 @@ export function createGame(
       camera.position.y += Math.sin(now * 0.016) * 0.035;
     }
     weapon?.update(now, sprinting);
+    grapple.draw();
     if (matchActive && document.pointerLockElement === canvas) {
       bot.update(deltaSeconds, now);
     }
@@ -667,6 +685,7 @@ export function createGame(
       requestMouseLock();
     },
     dispose: () => {
+      grapple.dispose();
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('resize', onResize);

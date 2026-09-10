@@ -8,6 +8,7 @@ import { createOrbRewards } from '@/game/createOrbRewards';
 import { createOrbWallet, type PurchaseResult } from '@/game/createOrbWallet';
 
 const initialHud: GameHudState = {
+  grappleState: 'idle',
   scoped: false,
   weaponId: 'assaultRifle',
   weaponName: 'Kestrel AR',
@@ -188,6 +189,14 @@ export function GameShell() {
             <i />
             <i />
           </div>
+          {hud.weaponId === 'orbiter' && !hud.paused && !hud.dead && !hud.roundWon && hud.result === 'none' && <p className={`grapple-hint ${hud.grappleState}`} role="status">{{
+            idle: 'Aim at solid cover · Hold E / right-click to grapple',
+            miss: 'No solid target within 35 m · Release and try again',
+            throwing: 'Orbiter thrown · Keep holding',
+            pulling: 'Pulling · Hold to cling, release to detach',
+            clinging: 'Clinging · Release E / right-click to drop',
+            blocked: 'Tether blocked · Release and aim again',
+          }[hud.grappleState]}</p>}
           {hud.hitMarker !== 'none' && (
             <div
               key={hud.hitId}
@@ -344,11 +353,12 @@ export function GameShell() {
                 <kbd>Mouse</kbd> Look around
               </span>
               <span className="control-chip">
-                <kbd>Click</kbd> Fire · Hold for AR
+                <kbd>Click</kbd> Fire / Melee · Hold for AR
               </span>
               <span className="control-chip">
-                <kbd>Q Toggle / Right click</kbd> Aim
+                <kbd>Q Toggle / Right click</kbd> Aim guns
               </span>
+              <span className="control-chip grapple-control"><kbd>Orbiter: Hold E / Right click</kbd> Aim at solid cover · Pull and cling · Release to drop</span>
               <span className="control-chip">
                 <kbd>R</kbd> Reload
               </span>

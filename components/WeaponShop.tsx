@@ -89,7 +89,7 @@ export function WeaponShop({ open, onOpenChange, orbs, orbsSaved, sniperOwned, o
         <h2>{WEAPON_DEFINITIONS[revealing].name}</h2>
         <p role="status">{revealing === 'orbiter' ? 'Unlocked · Melee slot 3' : 'Unlocked · Available as a primary'}</p>
         {open && <WeaponPreview key={revealing} weaponId={revealing} reveal />}
-        <p>{revealing === 'orbiter' ? 'Press 3 to equip. Click to swing at a nearby enemy.' : 'Choose Equip primary in the shop, then press 1 in the arena. Q or right click to scope.'}</p>
+        <p>{revealing === 'orbiter' ? 'Press 3 to equip. Click to swing. Aim at solid cover, then hold E or right-click to grapple and cling; release to drop.' : 'Choose Equip primary in the shop, then press 1 in the arena. Q or right click to scope.'}</p>
         <button type="button" className="primary-button common-buy" onClick={() => setRevealing(null)}>Continue</button>
       </section> : <div className="shop-layout">
         <nav className="shop-list" aria-label="Shop weapons">
@@ -101,7 +101,7 @@ export function WeaponShop({ open, onOpenChange, orbs, orbsSaved, sniperOwned, o
         <section className="shop-showcase" aria-label={stats.name}>
           <h2>{stats.name}</h2>
           {open && <WeaponPreview key={selected} weaponId={selected} blurred={selected === 'sniper' && !sniperOwned} glitched={selected === 'orbiter' && !orbiterOwned} />}
-          <p>{selected === 'orbiter' ? 'Orbital-blade melee · Close range, one click per swing.' : selected === 'sniper' ? 'Scoped precision rifle · One click per shot.' : selected === 'assaultRifle' ? 'Automatic rifle · Your frontline weapon.' : 'Semi-automatic pistol · Your backup weapon.'}</p>
+          <p>{selected === 'orbiter' ? 'Click to swing. Aim at solid cover; hold E / right-click to grapple and cling. Release to drop. Grapple reach: 35 m.' : selected === 'sniper' ? 'Scoped precision rifle · One click per shot.' : selected === 'assaultRifle' ? 'Automatic rifle · Your frontline weapon.' : 'Semi-automatic pistol · Your backup weapon.'}</p>
         </section>
         <section className="shop-overview" aria-label="Weapon stats">
           <h3>Overview</h3>

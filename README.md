@@ -28,6 +28,10 @@ Open `http://localhost:3000` in a normal desktop web browser. Press `Control + C
 - Hold `Shift` to slide on the ground, even from a standstill. The initial boost fades over 0.65 seconds; release to stop. There is no cooldown, so you can slide again immediately. When standing still, you slide forward in the direction you face.
 - `Esc` — release the cursor and pause
 
+### Orbiter grapple (mouse or touchpad)
+
+Equip the unlocked Orbiter with **3**, aim the crosshair at a solid wall, ledge or platform within **35 metres**, then **hold E** (touchpad-friendly) or **hold right-click**. The thrown Orbiter and purple tether show the attachment point. Keep holding to pull toward it and cling; release to detach and fall. If using both controls, release both. Left-click remains melee. No valid target or a blocked path shows a hint; release and aim again. Switching away, dying, pausing, or losing window focus detaches safely. The grapple uses existing player collisions and does not damage or move objects. Tune reach and pull speed in `game/createGrapple.ts`. Run `node tests/grapple.test.mjs` to check grappling.
+
 ## Local Orbs rewards
 
 Win a round to earn 10 Orbs. Winning the first-to-five match adds 25 bonus Orbs (75 total for a match victory). Losing never removes earned Orbs. The shop shows your balance and reward rules. Clicking its Orbs badge plays an animation and advances the free Orbiter unlock.

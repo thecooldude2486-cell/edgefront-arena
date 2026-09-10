@@ -1,4 +1,8 @@
 @import 'tailwindcss';
+.grapple-hint { position: absolute; top: calc(50% + 42px); left: 50%; transform: translateX(-50%); max-width: calc(100vw - 32px); width: max-content; text-align: center; padding: 8px 14px; border: 1px solid #b45cff66; border-radius: 8px; background: #111222dc; color: #dbc3ff; font-size: 14px; pointer-events: none; }
+.grapple-hint.clinging { border-color: #c080ff; color: white; }
+.control-chip.grapple-control { grid-column: 1 / -1; flex-wrap: wrap; font-size: 14px; line-height: 1.5; }
+.grapple-control kbd { flex-shrink: 0; }
 .orbiter-progress { text-align: center; color: #ceabff; font-size: 14px; margin: 0; }
 [data-slot='dialog-content'].orbiter-unlocking { border-color: #b45cff; box-shadow: 0 0 60px #a450ff30; }
 .sniper-unlock.orbiter-reveal { border-color: #b45cff88; background: radial-gradient(ellipse at center, #51386c88, #10111b 75%); }

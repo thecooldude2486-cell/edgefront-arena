@@ -645,6 +645,7 @@ export function createWeapon(
 
   return {
     selectWeapon: switchWeapon,
+    get id() { return currentWeaponId; },
     update(now: number, sprinting: boolean) {
       if (currentWeaponId !== 'pistol' && currentWeaponId !== 'orbiter' && currentWeaponId !== primaryWeapon()) switchWeapon(primaryWeapon());
       sprintPoseActive = sprinting && active;
