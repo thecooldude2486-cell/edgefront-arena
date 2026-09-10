@@ -18,7 +18,8 @@ Open `http://localhost:3000` in a normal desktop web browser. Press `Control + C
 
 - `W A S D` — move
 - Move the mouse or touchpad to look around
-- Tap left click for one shot, or hold it for rapid fire
+- Tap left click for one shot; only the AR fires continuously while held
+- `1` — chosen primary (Kestrel AR or Meridian Sniper) · `2` — Vesper Pistol · `3` — Orbiter melee (after unlock)
 - Press `Q` to toggle aiming, or hold right click to aim
 - `R` — reload
 - `Space` — jump
@@ -26,6 +27,20 @@ Open `http://localhost:3000` in a normal desktop web browser. Press `Control + C
 - Press `C` or `Ctrl` to toggle crouching; press again to stand
 - Hold `Shift` to slide on the ground, even from a standstill. The initial boost fades over 0.65 seconds; release to stop. There is no cooldown, so you can slide again immediately. When standing still, you slide forward in the direction you face.
 - `Esc` — release the cursor and pause
+
+## Local Orbs rewards
+
+Win a round to earn 10 Orbs. Winning the first-to-five match adds 25 bonus Orbs (75 total for a match victory). Losing never removes earned Orbs. The shop shows your balance and reward rules. Clicking its Orbs badge plays an animation and advances the free Orbiter unlock.
+
+**Orbiter** is an original grey, white and black orbital-blade melee with a glowing purple centre ring and dot. Click the shop's Orb badge **20 times** to unlock it with a glitch-to-clear reveal. Progress and ownership save in this browser; no Orbs are spent. Press **3** to equip, then click once per swing. It deals **35 damage**, reaches **3 metres**, has a **0.65-second** swing delay, and uses no ammo, reload or scope. Its stats live in `game/weaponDefinitions.ts`, model in `game/createOrbiterModel.ts`, and click requirement in `game/createOrbWallet.ts`. Your primary and Vesper remain equipped alongside it; only slot 4 is empty.
+
+The **Meridian Sniper** costs **300 Orbs** and has Common (green) rarity. Buy it in the weapon shop to see the blurred-to-clear green reveal. Choose **Equip primary** on either the Kestrel or Meridian: you carry only one primary plus the Vesper secondary and unlocked Orbiter melee. Press `1` for your chosen primary and `2` for the pistol. Your choice stays through respawns and Play Again; refreshing defaults to Kestrel without removing sniper ownership. Choosing a different primary does not refill ammo. Use `Q` or right click to scope the sniper. It starts each life with **5 / 15** ammo, deals **70 body / 100 head** damage, fires once per click (at least **1.2 seconds** between shots), and reloads in **2.4 seconds**. AR and pistol stats are unchanged.
+
+The price and browser-local purchase save are in `game/createOrbWallet.ts`. All gun stats are in `game/weaponDefinitions.ts`; the original sniper model is in `game/createSniperModel.ts`. A purchase saves ownership and subtracts Orbs together; failed saving does not charge Orbs. Existing local Orb balances are carried over. Clearing browser site data removes both Orbs and unlocks. They do not sync to another device or to the online address.
+
+Run the targeted sniper checks with Node 24 or later: `node tests/sniper.test.mjs`.
+
+Orbs are saved in this browser for this site address. Localhost and the online game do not share a balance; clearing browser site data removes the save. If browser storage is blocked, rewards still work for the current page and the shop shows a warning. Reward amounts are configured in `game/createOrbRewards.ts`.
 
 ## Main files, in plain language
 
@@ -44,4 +59,4 @@ Open `http://localhost:3000` in a normal desktop web browser. Press `Control + C
 
 Open `game/config.ts` if you want to make safe first changes. For example, change `walkSpeed`, `bodyDamage`, or `fireDelayMs`, save the file, and the browser will update automatically while `pnpm dev` is running.
 
-The project deliberately has no accounts, database, online multiplayer, store, inventory, extra guns, building, crafting, or destructible environment.
+The project deliberately has no accounts, database, online multiplayer, real-money purchases, building, crafting, or destructible environment.

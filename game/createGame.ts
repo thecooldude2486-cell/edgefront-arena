@@ -20,6 +20,7 @@ import {
   applyWeaponDamage,
   type WeaponHitZone,
   type WeaponId,
+  type PrimaryWeaponId,
 } from './weaponDefinitions';
 import { createArena } from './createArena';
 import {
@@ -47,6 +48,8 @@ if (import.meta.hot) {
 export function createGame(
   canvas: HTMLCanvasElement,
   onHudUpdate: (update: GameHudUpdate) => void,
+  canUseWeapon: (weaponId: WeaponId) => boolean = (id) => id === 'assaultRifle' || id === 'pistol',
+  getPrimaryWeapon: () => PrimaryWeaponId = () => 'assaultRifle',
 ) {
   const engine = new Engine(canvas, true, {
     preserveDrawingBuffer: false,
@@ -324,6 +327,9 @@ export function createGame(
 
   let hitId = 0;
   weapon = createWeapon(scene, camera, canvas, {
+    canUseWeapon,
+    getPrimaryWeapon,
+    onScopeChange: (scoped) => onHudUpdate({ scoped }),
     onAmmoChange: (
       ammo,
       reserveAmmo,

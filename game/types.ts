@@ -1,6 +1,7 @@
 import type { WeaponId } from './weaponDefinitions';
 
 export type GameHudState = {
+  scoped: boolean;
   weaponId: WeaponId;
   weaponName: string;
   fireMode: string;

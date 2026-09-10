@@ -11,9 +11,15 @@ import {
 } from '@babylonjs/core';
 import { COLORS, PISTOL, WEAPON } from './config';
 import { createWeaponAmmo } from './createWeaponAmmo';
-import type { WeaponHit, WeaponId } from './weaponDefinitions';
+import type { WeaponHit, WeaponId, PrimaryWeaponId } from './weaponDefinitions';
+import { WEAPON_DEFINITIONS } from './weaponDefinitions';
+import { populateSniperModel } from './createSniperModel';
+import { populateOrbiterModel } from './createOrbiterModel';
 
 type WeaponCallbacks = {
+  getPrimaryWeapon?: () => PrimaryWeaponId;
+  canUseWeapon?: (weaponId: WeaponId) => boolean;
+  onScopeChange?: (scoped: boolean) => void;
   onAmmoChange: (
     ammo: number,
     reserveAmmo: number,
@@ -44,6 +50,19 @@ function createShotSound() {
   }
 
   return {
+    playSwing() {
+      const audio = ensureContext();
+      const now = audio.currentTime;
+      const oscillator = audio.createOscillator();
+      const gain = audio.createGain();
+      oscillator.type = 'triangle';
+      oscillator.frequency.setValueAtTime(480, now);
+      oscillator.frequency.exponentialRampToValueAtTime(90, now + .18);
+      gain.gain.setValueAtTime(.06, now);
+      gain.gain.exponentialRampToValueAtTime(.0001, now + .2);
+      oscillator.connect(gain).connect(audio.destination);
+      oscillator.start(now); oscillator.stop(now + .21);
+    },
     playShot() {
       const audio = ensureContext();
       const now = audio.currentTime;
@@ -307,6 +326,16 @@ export function createWeapon(
   pistolRoot.rotation.copyFrom(pistolHipRotation);
   populateWeaponModels(scene, root, pistolRoot);
   pistolRoot.setEnabled(false);
+  const sniperRoot = new TransformNode('meridian sniper root', scene);
+  sniperRoot.parent = camera;
+  populateSniperModel(scene, sniperRoot);
+  sniperRoot.position.set(.42, -.38, .88);
+  sniperRoot.setEnabled(false);
+  const orbiterRoot = new TransformNode('orbiter melee root', scene);
+  orbiterRoot.parent = camera;
+  populateOrbiterModel(scene, orbiterRoot);
+  orbiterRoot.position.set(.55, -.4, 1.1);
+  orbiterRoot.setEnabled(false);
 
   const flash = MeshBuilder.CreateSphere(
     'muzzle flash',
@@ -335,12 +364,31 @@ export function createWeapon(
   const weaponStats = {
     assaultRifle: WEAPON,
     pistol: PISTOL,
+    sniper: WEAPON_DEFINITIONS.sniper,
+    orbiter: WEAPON_DEFINITIONS.orbiter,
   };
   const weaponRoots = {
     assaultRifle: root,
     pistol: pistolRoot,
+    sniper: sniperRoot,
+    orbiter: orbiterRoot,
   };
   const weaponPoses = {
+    orbiter: {
+      hipPosition: new Vector3(.55, -.4, 1.1), hipRotation: new Vector3(.1, -.2, -.25),
+      aimPosition: new Vector3(.55, -.4, 1.1), aimRotation: new Vector3(.1, -.2, -.25),
+      sprintPosition: new Vector3(.6, -.5, 1.0), sprintRotation: new Vector3(.2, -.3, -.4),
+      muzzlePosition: Vector3.Zero(),
+    },
+    sniper: {
+      hipPosition: new Vector3(.42, -.38, .88),
+      hipRotation: new Vector3(-.02, -.045, 0),
+      aimPosition: new Vector3(0, -.25, .58),
+      aimRotation: Vector3.Zero(),
+      sprintPosition: new Vector3(.34, -.5, .72),
+      sprintRotation: new Vector3(.14, -.12, .08),
+      muzzlePosition: new Vector3(0, .015, 1.56),
+    },
     assaultRifle: {
       hipPosition,
       hipRotation,
@@ -363,10 +411,14 @@ export function createWeapon(
   const ammoSupplies = {
     assaultRifle: createWeaponAmmo(WEAPON.magazineSize, WEAPON.reserveAmmo),
     pistol: createWeaponAmmo(PISTOL.magazineSize, PISTOL.reserveAmmo),
+    sniper: createWeaponAmmo(WEAPON_DEFINITIONS.sniper.magazineSize, WEAPON_DEFINITIONS.sniper.reserveAmmo),
+    orbiter: createWeaponAmmo(0, 0),
   };
   const lastShotAt: Record<WeaponId, number> = {
     assaultRifle: -Infinity,
     pistol: -Infinity,
+    sniper: -Infinity,
+    orbiter: -Infinity,
   };
   let currentWeaponId: WeaponId = 'assaultRifle';
   let firing = false;
@@ -377,6 +429,13 @@ export function createWeapon(
   let reloadTimer: ReturnType<typeof setTimeout> | null = null;
   let flashTimer: ReturnType<typeof setTimeout> | null = null;
   let active = true;
+  let scoped = false;
+  let swingAt = -Infinity;
+  function setScoped(next: boolean) {
+    if (scoped === next) return;
+    scoped = next;
+    callbacks.onScopeChange?.(next);
+  }
 
   function updateHud(isReloading = reloading) {
     const ammo = ammoSupplies[currentWeaponId].state;
@@ -399,7 +458,11 @@ export function createWeapon(
 
   function switchWeapon(nextWeaponId: WeaponId) {
     if (nextWeaponId === currentWeaponId || !active) return;
+    if (nextWeaponId !== 'pistol' && nextWeaponId !== 'orbiter' && nextWeaponId !== primaryWeapon()) return;
+    if (callbacks.canUseWeapon && !callbacks.canUseWeapon(nextWeaponId)) return;
+    setScoped(false);
     cancelReload();
+    swingAt = -Infinity;
     firing = false;
     pointerAiming = false;
     keyboardAiming = false;
@@ -410,6 +473,12 @@ export function createWeapon(
   }
 
   updateHud(false);
+
+  // Both rifles share slot 1. Ownership alone does not equip the sniper.
+  function primaryWeapon(): PrimaryWeaponId {
+    const selected = callbacks.getPrimaryWeapon?.() ?? 'assaultRifle';
+    return callbacks.canUseWeapon?.(selected) === false ? 'assaultRifle' : selected;
+  }
 
   function showImpact(position: Vector3) {
     const spark = MeshBuilder.CreateSphere(
@@ -424,6 +493,7 @@ export function createWeapon(
   }
 
   function reload() {
+    if (currentWeaponId === 'orbiter') return;
     const stats = weaponStats[currentWeaponId];
     const ammoSupply = ammoSupplies[currentWeaponId];
     const ammo = ammoSupply.state;
@@ -435,6 +505,17 @@ export function createWeapon(
       return;
     reloading = true;
     firing = false;
+    if (currentWeaponId === 'sniper') {
+      // The solid scope must never reappear in the camera's aimed position.
+      // Reload cancels both aim controls; the next deliberate aim starts fresh.
+      pointerAiming = false;
+      keyboardAiming = false;
+      setScoped(false);
+      sniperRoot.position.copyFrom(weaponPoses.sniper.hipPosition);
+      sniperRoot.rotation.copyFrom(weaponPoses.sniper.hipRotation);
+      sniperRoot.setEnabled(active);
+      camera.fov = 1.05;
+    }
     updateHud(true);
     audio.playReload();
     const reloadingWeaponId = currentWeaponId;
@@ -454,17 +535,21 @@ export function createWeapon(
       now - lastShotAt[currentWeaponId] < stats.fireDelayMs
     )
       return;
-    if (ammoSupply.state.magazine <= 0) {
+    if (currentWeaponId !== 'orbiter' && ammoSupply.state.magazine <= 0) {
       reload();
       return;
     }
 
     lastShotAt[currentWeaponId] = now;
+    if (currentWeaponId === 'orbiter') {
+      swingAt = now;
+      audio.playSwing();
+    } else {
     ammoSupply.fire();
     updateHud(false);
     audio.playShot();
     camera.rotation.x -=
-      currentWeaponId === 'pistol'
+      currentWeaponId === 'sniper' ? .024 : currentWeaponId === 'pistol'
         ? 0.007 + Math.random() * 0.004
         : 0.009 + Math.random() * 0.006;
     const activeRoot = weaponRoots[currentWeaponId];
@@ -490,6 +575,7 @@ export function createWeapon(
       flash.setEnabled(false);
       flashLight.intensity = 0;
     }, 45);
+    }
 
     // The ray begins exactly at the centre of the player's view.
     const ray = camera.getForwardRay(stats.range);
@@ -505,16 +591,16 @@ export function createWeapon(
   }
 
   const onPointerDown = (event: PointerEvent) => {
-    if (document.pointerLockElement !== canvas) return;
+    if (document.pointerLockElement !== canvas || !active) return;
     if (event.button === 0) {
-      if (weaponStats[currentWeaponId].fireMode === 'Semi') {
+      if (weaponStats[currentWeaponId].fireMode !== 'Auto') {
         // Semi-automatic fire: one pointer press can produce only one shot.
         shoot(performance.now());
       } else {
         firing = true;
       }
     }
-    if (event.button === 2) pointerAiming = true;
+    if (event.button === 2 && currentWeaponId !== 'orbiter' && !(currentWeaponId === 'sniper' && reloading)) pointerAiming = true;
   };
   const onPointerUp = (event: PointerEvent) => {
     if (event.button === 0) firing = false;
@@ -528,14 +614,17 @@ export function createWeapon(
       active &&
       !event.repeat
     ) {
-      if (event.code === 'Digit1') switchWeapon('assaultRifle');
+      if (event.code === 'Digit1') switchWeapon(primaryWeapon());
       if (event.code === 'Digit2') switchWeapon('pistol');
+      if (event.code === 'Digit3') switchWeapon('orbiter');
     }
     if (
       event.code === 'KeyQ' &&
       !event.repeat &&
       document.pointerLockElement === canvas &&
-      active
+      active &&
+      currentWeaponId !== 'orbiter' &&
+      !(currentWeaponId === 'sniper' && reloading)
     ) {
       keyboardAiming = !keyboardAiming;
     }
@@ -545,6 +634,7 @@ export function createWeapon(
       firing = false;
       pointerAiming = false;
       keyboardAiming = false;
+      setScoped(false);
     }
   };
   canvas.addEventListener('pointerdown', onPointerDown);
@@ -556,6 +646,7 @@ export function createWeapon(
   return {
     selectWeapon: switchWeapon,
     update(now: number, sprinting: boolean) {
+      if (currentWeaponId !== 'pistol' && currentWeaponId !== 'orbiter' && currentWeaponId !== primaryWeapon()) switchWeapon(primaryWeapon());
       sprintPoseActive = sprinting && active;
       if (
         firing &&
@@ -564,7 +655,10 @@ export function createWeapon(
       )
         shoot(now);
       const aimingDownSights =
-        (pointerAiming || keyboardAiming) && active && !sprintPoseActive;
+        (pointerAiming || keyboardAiming) && active && !sprintPoseActive &&
+        !(currentWeaponId === 'sniper' && reloading);
+      setScoped(currentWeaponId === 'sniper' && aimingDownSights && !reloading);
+      sniperRoot.setEnabled(active && currentWeaponId === 'sniper' && !scoped);
       const activeRoot = weaponRoots[currentWeaponId];
       const poses = weaponPoses[currentWeaponId];
       let targetPosition = aimingDownSights
@@ -591,6 +685,12 @@ export function createWeapon(
         );
       }
       const positionBlend = aimingDownSights ? 0.24 : 0.18;
+      if (currentWeaponId === 'orbiter') {
+        const progress = Math.min(1, Math.max(0, (now - swingAt) / 420));
+        const swing = Math.sin(progress * Math.PI);
+        targetPosition = targetPosition.add(new Vector3(-.65 * swing, .12 * swing, .12 * swing));
+        targetRotation = targetRotation.add(new Vector3(-.35 * swing, -.8 * swing, -1.5 * swing));
+      }
       activeRoot.position = Vector3.Lerp(
         activeRoot.position,
         targetPosition,
@@ -601,10 +701,11 @@ export function createWeapon(
         targetRotation,
         positionBlend,
       );
-      const targetFov = aimingDownSights ? 0.82 : sprinting ? 1.12 : 1.05;
+      const targetFov = aimingDownSights ? (scoped ? .35 : .82) : sprinting ? 1.12 : 1.05;
       camera.fov += (targetFov - camera.fov) * 0.16;
     },
     setActive(nextActive: boolean) {
+      setScoped(false);
       active = nextActive;
       firing = false;
       pointerAiming = false;
@@ -612,8 +713,12 @@ export function createWeapon(
       sprintPoseActive = false;
       root.setEnabled(nextActive && currentWeaponId === 'assaultRifle');
       pistolRoot.setEnabled(nextActive && currentWeaponId === 'pistol');
+      sniperRoot.setEnabled(nextActive && currentWeaponId === 'sniper');
+      orbiterRoot.setEnabled(nextActive && currentWeaponId === 'orbiter');
     },
     reset() {
+      swingAt = -Infinity;
+      setScoped(false);
       cancelReload();
       pointerAiming = false;
       keyboardAiming = false;
@@ -621,9 +726,12 @@ export function createWeapon(
       firing = false;
       ammoSupplies.assaultRifle.reset();
       ammoSupplies.pistol.reset();
-      currentWeaponId = 'assaultRifle';
-      root.setEnabled(active);
+      ammoSupplies.sniper.reset();
+      currentWeaponId = primaryWeapon();
+      root.setEnabled(active && currentWeaponId === 'assaultRifle');
       pistolRoot.setEnabled(false);
+      sniperRoot.setEnabled(active && currentWeaponId === 'sniper');
+      orbiterRoot.setEnabled(false);
       updateHud(false);
     },
     dispose() {
@@ -637,6 +745,8 @@ export function createWeapon(
       audio.dispose();
       root.dispose();
       pistolRoot.dispose();
+      sniperRoot.dispose();
+      orbiterRoot.dispose();
       flashLight.dispose();
     },
   };

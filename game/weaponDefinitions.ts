@@ -1,4 +1,9 @@
 export const WEAPON_DEFINITIONS = {
+  orbiter: {
+    name: 'Orbiter', magazineSize: 0, reserveAmmo: 0,
+    bodyDamage: 35, headDamage: 35, reloadMs: 0,
+    fireDelayMs: 650, fireMode: 'Melee', range: 3,
+  },
   assaultRifle: {
     name: 'Kestrel AR',
     magazineSize: 20,
@@ -21,9 +26,21 @@ export const WEAPON_DEFINITIONS = {
     fireMode: 'Semi',
     range: 130,
   },
+  sniper: {
+    name: 'Meridian Sniper',
+    magazineSize: 5,
+    reserveAmmo: 15,
+    bodyDamage: 70,
+    headDamage: 100,
+    reloadMs: 2400,
+    fireDelayMs: 1200,
+    fireMode: 'Semi',
+    range: 240,
+  },
 } as const;
 
 export type WeaponId = keyof typeof WEAPON_DEFINITIONS;
+export type PrimaryWeaponId = 'assaultRifle' | 'sniper';
 export type WeaponHitZone = 'body' | 'head';
 export type WeaponHit = 'none' | WeaponHitZone;
 

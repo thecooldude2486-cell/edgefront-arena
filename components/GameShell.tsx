@@ -2,10 +2,13 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { GameHudState } from '@/game/types';
-import type { WeaponId } from '@/game/weaponDefinitions';
+import type { WeaponId, PrimaryWeaponId } from '@/game/weaponDefinitions';
 import { WeaponShop } from './WeaponShop';
+import { createOrbRewards } from '@/game/createOrbRewards';
+import { createOrbWallet, type PurchaseResult } from '@/game/createOrbWallet';
 
 const initialHud: GameHudState = {
+  scoped: false,
   weaponId: 'assaultRifle',
   weaponName: 'Kestrel AR',
   fireMode: 'Auto',
@@ -42,17 +45,75 @@ export function GameShell() {
   const [shopOpen, setShopOpen] = useState(false);
   const [error, setError] = useState('');
   const [hud, setHud] = useState(initialHud);
+  const [orbs, setOrbs] = useState(0);
+  const [orbReward, setOrbReward] = useState(0);
+  const [orbsSaved, setOrbsSaved] = useState(true);
+  const [sniperOwned, setSniperOwned] = useState(false);
+  const [orbiterOwned, setOrbiterOwned] = useState(false);
+  const [orbClicks, setOrbClicks] = useState(0);
+  const [primaryWeapon, setPrimaryWeapon] = useState<PrimaryWeaponId>('assaultRifle');
+  const primaryRef = useRef<PrimaryWeaponId>('assaultRifle');
+  const walletRef = useRef<ReturnType<typeof createOrbWallet> | null>(null);
+
+  function syncWallet() {
+    const state = walletRef.current?.state;
+    if (!state) return;
+    setOrbs(state.orbs);
+    setSniperOwned(state.sniperOwned);
+    setOrbiterOwned(state.orbiterOwned);
+    setOrbClicks(state.orbClicks);
+    setOrbsSaved(state.saved);
+  }
+
+  function buySniper(): PurchaseResult {
+    const result = walletRef.current?.buySniper() ?? 'unavailable';
+    syncWallet();
+    return result;
+  }
+  function clickOrb() {
+    const result = walletRef.current?.clickOrb() ?? 'unavailable';
+    syncWallet();
+    return result;
+  }
+
+  function equipPrimary(id: PrimaryWeaponId) {
+    if (id === 'sniper' && !walletRef.current?.state.sniperOwned) return;
+    primaryRef.current = id;
+    setPrimaryWeapon(id);
+    // Changing a loadout does not refill either weapon's ammunition.
+    gameRef.current?.selectWeapon(id);
+  }
 
   useEffect(() => {
     let cancelled = false;
+    const rewards = createOrbRewards();
+    let storage: Storage | undefined;
+    let rewardTimer: ReturnType<typeof setTimeout> | undefined;
+    let pendingReward = 0;
+    try {
+      storage = window.localStorage;
+    } catch { setOrbsSaved(false); }
+    walletRef.current = createOrbWallet(storage);
+    syncWallet();
     async function startEngine() {
       try {
         // Babylon is loaded in the browser only, keeping the server build simple.
         const { createGame } = await import('@/game/createGame');
         if (!canvasRef.current || cancelled) return;
         gameRef.current = createGame(canvasRef.current, (update) => {
+          if (cancelled) return;
+          const earned = rewards.update(update);
+          if (earned > 0) {
+            walletRef.current?.award(earned);
+            syncWallet();
+            // The final round and victory arrive separately; combine their popup.
+            pendingReward += earned;
+            setOrbReward(pendingReward);
+            clearTimeout(rewardTimer);
+            rewardTimer = setTimeout(() => { pendingReward = 0; setOrbReward(0); }, 3000);
+          }
           setHud((current) => ({ ...current, ...update }));
-        });
+        }, (id) => id === 'orbiter' ? walletRef.current?.state.orbiterOwned === true : id !== 'sniper' || walletRef.current?.state.sniperOwned === true, () => primaryRef.current);
         setStatus('ready');
       } catch (caught) {
         console.error(caught);
@@ -68,6 +129,7 @@ export function GameShell() {
     startEngine();
     return () => {
       cancelled = true;
+      clearTimeout(rewardTimer);
       gameRef.current?.dispose();
     };
   }, []);
@@ -101,6 +163,18 @@ export function GameShell() {
 
       {started && (
         <div className="combat-hud" aria-live="polite">
+          {hud.scoped && <div className="sniper-scope" aria-hidden="true"><div className="sniper-scope-lens"><i /><b /></div></div>}
+          <section className="scoreboard" aria-label={`Match score: Player 1 ${hud.playerScore}, Rook ${hud.botScore}. First to 5.`}>
+            <div className="score-side player-side">
+              <span>Player 1</span>
+              <strong>{hud.playerScore}</strong>
+            </div>
+            <div className="score-goal"><span>First to</span><strong>5</strong></div>
+            <div className="score-side bot-side">
+              <span>Rook</span>
+              <strong>{hud.botScore}</strong>
+            </div>
+          </section>
           {hud.damageId > 0 && (
             <div
               key={hud.damageId}
@@ -108,7 +182,7 @@ export function GameShell() {
               aria-hidden="true"
             />
           )}
-          <div className="crosshair" aria-hidden="true">
+          <div className={`crosshair ${hud.scoped ? 'scope-hidden' : ''}`} aria-hidden="true">
             <i />
             <i />
             <i />
@@ -130,12 +204,12 @@ export function GameShell() {
             <nav className="weapon-selector" aria-label="Weapon slots">
               <button
                 type="button"
-                className={`weapon-slot ${hud.weaponId === 'assaultRifle' ? 'active' : ''}`}
-                aria-pressed={hud.weaponId === 'assaultRifle'}
-                onClick={() => selectWeapon('assaultRifle')}
+                className={`weapon-slot ${hud.weaponId === primaryWeapon ? 'active' : ''}`}
+                aria-pressed={hud.weaponId === primaryWeapon}
+                onClick={() => selectWeapon(primaryWeapon)}
               >
                 <span className="weapon-slot-kind">Primary</span>
-                <strong>Kestrel AR</strong>
+                <strong>{primaryWeapon === 'sniper' ? 'Meridian' : 'Kestrel AR'}</strong>
                 <kbd>1</kbd>
               </button>
               <button
@@ -148,7 +222,10 @@ export function GameShell() {
                 <strong>Vesper</strong>
                 <kbd>2</kbd>
               </button>
-              {[3, 4].map((slot) => (
+              <button type="button" className={`weapon-slot ${hud.weaponId === 'orbiter' ? 'active' : ''} ${!orbiterOwned ? 'empty' : ''}`} disabled={!orbiterOwned} aria-pressed={hud.weaponId === 'orbiter'} onClick={() => selectWeapon('orbiter')} aria-label={orbiterOwned ? 'Equip Orbiter melee' : 'Unlock Orbiter by clicking the shop Orb badge 20 times'}>
+                <span className="weapon-slot-kind">Melee</span><strong>{orbiterOwned ? 'Orbiter' : 'Locked'}</strong><kbd>3</kbd>
+              </button>
+              {[4].map((slot) => (
                 <button
                   key={slot}
                   type="button"
@@ -169,8 +246,7 @@ export function GameShell() {
               <span className="fire-mode">{hud.fireMode}</span>
             </div>
             <div className="ammo-row">
-              <strong>{hud.ammo}</strong>
-              <span>/ {hud.reserveAmmo}</span>
+              {hud.weaponId === 'orbiter' ? <strong style={{ fontSize: '24px' }}>Melee</strong> : <><strong>{hud.ammo}</strong><span>/ {hud.reserveAmmo}</span></>}
             </div>
             <div className={`reload-status ${hud.reloading ? 'visible' : ''}`}>
               Reloading
@@ -218,7 +294,7 @@ export function GameShell() {
             <section className="pause-screen" aria-labelledby="pause-title">
               <p>Match paused</p>
               <h2 id="pause-title">Cursor released</h2>
-              <button className="shop-open-button" type="button" onClick={() => setShopOpen(true)}>Weapon shop</button>
+              <button className="primary-button shop-open-button" type="button" onClick={() => setShopOpen(true)}>Weapon shop</button>
               <button
                 className="primary-button"
                 type="button"
@@ -268,7 +344,7 @@ export function GameShell() {
                 <kbd>Mouse</kbd> Look around
               </span>
               <span className="control-chip">
-                <kbd>Hold Click</kbd> Rapid fire
+                <kbd>Click</kbd> Fire · Hold for AR
               </span>
               <span className="control-chip">
                 <kbd>Q Toggle / Right click</kbd> Aim
@@ -277,7 +353,7 @@ export function GameShell() {
                 <kbd>R</kbd> Reload
               </span>
               <span className="control-chip">
-                <kbd>1 / 2</kbd> Switch weapon
+                <kbd>1 / 2 / 3</kbd> Primary / Secondary / Melee
               </span>
               <span className="control-chip">
                 <kbd>Double-tap W</kbd> Sprint
@@ -298,25 +374,31 @@ export function GameShell() {
             <button
               className="primary-button"
               type="button"
-              onClick={enterArena}
-              disabled={status !== 'ready'}
+              onClick={status === 'error' ? () => window.location.reload() : enterArena}
+              disabled={status === 'loading'}
             >
               {status === 'loading'
                 ? 'Preparing arena…'
                 : status === 'error'
-                  ? 'Engine error'
+                  ? 'Reload game'
                   : 'Enter arena'}
             </button>
             {status === 'loading' && (
               <p className="loading-line">Calibrating the arena renderer…</p>
             )}
-            {status === 'error' && <p className="error-message">{error}</p>}
-            <button className="shop-open-button" type="button" onClick={() => setShopOpen(true)}>Weapon shop</button>
+            {status === 'error' && (
+              <div className="error-message" role="alert">
+                <p>The game could not load. Try Reload game. If you are using localhost, the local game server must be running.</p>
+                <details><summary>Technical details</summary>{error}</details>
+              </div>
+            )}
+            <button className="primary-button shop-open-button" type="button" onClick={() => setShopOpen(true)}>Weapon shop</button>
           </div>
         </section>
       )}
 
-      <WeaponShop open={shopOpen} onOpenChange={setShopOpen} />
+      {orbReward > 0 && <div className="orb-reward-toast" role="status">+{orbReward} Orbs earned</div>}
+      <WeaponShop open={shopOpen} onOpenChange={setShopOpen} orbs={orbs} orbsSaved={orbsSaved} sniperOwned={sniperOwned} onBuySniper={buySniper} primaryWeapon={primaryWeapon} onEquipPrimary={equipPrimary} orbiterOwned={orbiterOwned} orbClicks={orbClicks} onOrbClick={clickOrb} />
       {started && <div className="pause-hint">ESC releases your mouse · Weapon shop in pause menu</div>}
     </main>
   );
