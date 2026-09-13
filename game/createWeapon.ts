@@ -14,9 +14,15 @@ import { createWeaponAmmo } from './createWeaponAmmo';
 import type { WeaponHit, WeaponId, PrimaryWeaponId } from './weaponDefinitions';
 import { WEAPON_DEFINITIONS } from './weaponDefinitions';
 import { populateSniperModel } from './createSniperModel';
+import { populateLauncherModel } from './createRockets';
+import { populateGrenadeModel } from './createGrenade';
+import { populateSwordModel } from './createSwordModel';
 import { populateOrbiterModel } from './createOrbiterModel';
 
 type WeaponCallbacks = {
+  onFireRocket?: (origin: Vector3, direction: Vector3) => void;
+  onThrowGrenade?: (origin: Vector3, direction: Vector3) => void;
+  getMeleeWeapon?: () => 'sword' | 'orbiter';
   getPrimaryWeapon?: () => PrimaryWeaponId;
   canUseWeapon?: (weaponId: WeaponId) => boolean;
   onScopeChange?: (scoped: boolean) => void;
@@ -331,6 +337,14 @@ export function createWeapon(
   populateSniperModel(scene, sniperRoot);
   sniperRoot.position.set(.42, -.38, .88);
   sniperRoot.setEnabled(false);
+  const rocketRoot = new TransformNode('comet launcher root', scene);
+  rocketRoot.parent = camera; populateLauncherModel(scene, rocketRoot); rocketRoot.setEnabled(false);
+  const grenadeRoot = new TransformNode('grenade utility root', scene);
+  grenadeRoot.parent = camera; populateGrenadeModel(scene, grenadeRoot); grenadeRoot.setEnabled(false);
+  const swordRoot = new TransformNode('sword melee root', scene);
+  swordRoot.parent = camera;
+  populateSwordModel(scene, swordRoot);
+  swordRoot.setEnabled(false);
   const orbiterRoot = new TransformNode('orbiter melee root', scene);
   orbiterRoot.parent = camera;
   populateOrbiterModel(scene, orbiterRoot);
@@ -362,18 +376,31 @@ export function createWeapon(
   const impactMaterial = weaponMaterial(scene, 'impact spark', '#dffaff', 0.9);
   const audio = createShotSound();
   const weaponStats = {
+    rocketLauncher: WEAPON_DEFINITIONS.rocketLauncher,
+    grenade: WEAPON_DEFINITIONS.grenade,
     assaultRifle: WEAPON,
     pistol: PISTOL,
     sniper: WEAPON_DEFINITIONS.sniper,
+    sword: WEAPON_DEFINITIONS.sword,
     orbiter: WEAPON_DEFINITIONS.orbiter,
   };
   const weaponRoots = {
+    rocketLauncher: rocketRoot,
+    grenade: grenadeRoot,
     assaultRifle: root,
     pistol: pistolRoot,
     sniper: sniperRoot,
+    sword: swordRoot,
     orbiter: orbiterRoot,
   };
   const weaponPoses = {
+    rocketLauncher: { hipPosition: new Vector3(.44, -.35, .85), hipRotation: Vector3.Zero(), aimPosition: new Vector3(0, -.24, .65), aimRotation: Vector3.Zero(), sprintPosition: new Vector3(.45, -.5, .8), sprintRotation: new Vector3(.1, -.1, .1), muzzlePosition: new Vector3(0, 0, .67) },
+    grenade: { hipPosition: new Vector3(.4, -.3, .7), hipRotation: Vector3.Zero(), aimPosition: new Vector3(.4, -.3, .7), aimRotation: Vector3.Zero(), sprintPosition: new Vector3(.4, -.4, .6), sprintRotation: Vector3.Zero(), muzzlePosition: Vector3.Zero() },
+    sword: {
+      hipPosition: new Vector3(.55, -.4, 1.1), hipRotation: new Vector3(.1, -.2, -.25),
+      aimPosition: new Vector3(.55, -.4, 1.1), aimRotation: new Vector3(.1, -.2, -.25),
+      sprintPosition: new Vector3(.6, -.5, 1), sprintRotation: new Vector3(.2, -.3, -.4), muzzlePosition: Vector3.Zero(),
+    },
     orbiter: {
       hipPosition: new Vector3(.55, -.4, 1.1), hipRotation: new Vector3(.1, -.2, -.25),
       aimPosition: new Vector3(.55, -.4, 1.1), aimRotation: new Vector3(.1, -.2, -.25),
@@ -409,15 +436,21 @@ export function createWeapon(
     },
   };
   const ammoSupplies = {
+    rocketLauncher: createWeaponAmmo(1, 5),
+    grenade: createWeaponAmmo(1, 0),
     assaultRifle: createWeaponAmmo(WEAPON.magazineSize, WEAPON.reserveAmmo),
     pistol: createWeaponAmmo(PISTOL.magazineSize, PISTOL.reserveAmmo),
     sniper: createWeaponAmmo(WEAPON_DEFINITIONS.sniper.magazineSize, WEAPON_DEFINITIONS.sniper.reserveAmmo),
+    sword: createWeaponAmmo(0, 0),
     orbiter: createWeaponAmmo(0, 0),
   };
   const lastShotAt: Record<WeaponId, number> = {
+    rocketLauncher: -Infinity,
+    grenade: -Infinity,
     assaultRifle: -Infinity,
     pistol: -Infinity,
     sniper: -Infinity,
+    sword: -Infinity,
     orbiter: -Infinity,
   };
   let currentWeaponId: WeaponId = 'assaultRifle';
@@ -458,7 +491,7 @@ export function createWeapon(
 
   function switchWeapon(nextWeaponId: WeaponId) {
     if (nextWeaponId === currentWeaponId || !active) return;
-    if (nextWeaponId !== 'pistol' && nextWeaponId !== 'orbiter' && nextWeaponId !== primaryWeapon()) return;
+    if (nextWeaponId !== 'grenade' && nextWeaponId !== 'pistol' && nextWeaponId !== (callbacks.getMeleeWeapon?.() ?? 'orbiter') && nextWeaponId !== primaryWeapon()) return;
     if (callbacks.canUseWeapon && !callbacks.canUseWeapon(nextWeaponId)) return;
     setScoped(false);
     cancelReload();
@@ -493,7 +526,7 @@ export function createWeapon(
   }
 
   function reload() {
-    if (currentWeaponId === 'orbiter') return;
+    if (weaponStats[currentWeaponId].fireMode === 'Melee') return;
     const stats = weaponStats[currentWeaponId];
     const ammoSupply = ammoSupplies[currentWeaponId];
     const ammo = ammoSupply.state;
@@ -535,13 +568,18 @@ export function createWeapon(
       now - lastShotAt[currentWeaponId] < stats.fireDelayMs
     )
       return;
-    if (currentWeaponId !== 'orbiter' && ammoSupply.state.magazine <= 0) {
+    if (weaponStats[currentWeaponId].fireMode !== 'Melee' && ammoSupply.state.magazine <= 0) {
       reload();
       return;
     }
 
     lastShotAt[currentWeaponId] = now;
-    if (currentWeaponId === 'orbiter') {
+    if (currentWeaponId === 'grenade') {
+      ammoSupply.fire(); updateHud(false);
+      callbacks.onThrowGrenade?.(camera.position.clone(), camera.getForwardRay().direction.clone());
+      return;
+    }
+    if (weaponStats[currentWeaponId].fireMode === 'Melee') {
       swingAt = now;
       audio.playSwing();
     } else {
@@ -577,6 +615,10 @@ export function createWeapon(
     }, 45);
     }
 
+    if (currentWeaponId === 'rocketLauncher') {
+      callbacks.onFireRocket?.(camera.position.clone(), camera.getForwardRay().direction.clone());
+      return;
+    }
     // The ray begins exactly at the centre of the player's view.
     const ray = camera.getForwardRay(stats.range);
     const hit = scene.pickWithRay(
@@ -584,9 +626,11 @@ export function createWeapon(
       (mesh) => mesh.isPickable && !mesh.name.startsWith('kestrel'),
     );
     if (hit?.hit && hit.pickedPoint && hit.pickedMesh) {
-      showImpact(hit.pickedPoint);
+      // Melee uses only the white HUD marker, never bullet impact effects.
+      const melee = stats.fireMode === 'Melee';
+      if (!melee) showImpact(hit.pickedPoint);
       const kind = callbacks.onImpact(hit.pickedMesh, currentWeaponId);
-      if (kind !== 'none') callbacks.onHitMarker(kind);
+      if (kind !== 'none') callbacks.onHitMarker(melee ? 'body' : kind);
     }
   }
 
@@ -600,7 +644,7 @@ export function createWeapon(
         firing = true;
       }
     }
-    if (event.button === 2 && currentWeaponId !== 'orbiter' && !(currentWeaponId === 'sniper' && reloading)) pointerAiming = true;
+    if (event.button === 2 && currentWeaponId !== 'grenade' && weaponStats[currentWeaponId].fireMode !== 'Melee' && !(currentWeaponId === 'sniper' && reloading)) pointerAiming = true;
   };
   const onPointerUp = (event: PointerEvent) => {
     if (event.button === 0) firing = false;
@@ -616,14 +660,15 @@ export function createWeapon(
     ) {
       if (event.code === 'Digit1') switchWeapon(primaryWeapon());
       if (event.code === 'Digit2') switchWeapon('pistol');
-      if (event.code === 'Digit3') switchWeapon('orbiter');
+      if (event.code === 'Digit4') switchWeapon('grenade');
+      if (event.code === 'Digit3') switchWeapon(callbacks.getMeleeWeapon?.() ?? 'orbiter');
     }
     if (
-      event.code === 'KeyQ' &&
+      currentWeaponId !== 'grenade' && event.code === 'KeyQ' &&
       !event.repeat &&
       document.pointerLockElement === canvas &&
       active &&
-      currentWeaponId !== 'orbiter' &&
+      weaponStats[currentWeaponId].fireMode !== 'Melee' &&
       !(currentWeaponId === 'sniper' && reloading)
     ) {
       keyboardAiming = !keyboardAiming;
@@ -647,7 +692,8 @@ export function createWeapon(
     selectWeapon: switchWeapon,
     get id() { return currentWeaponId; },
     update(now: number, sprinting: boolean) {
-      if (currentWeaponId !== 'pistol' && currentWeaponId !== 'orbiter' && currentWeaponId !== primaryWeapon()) switchWeapon(primaryWeapon());
+      if (currentWeaponId !== 'grenade' && currentWeaponId !== 'pistol' && weaponStats[currentWeaponId].fireMode !== 'Melee' && currentWeaponId !== primaryWeapon()) switchWeapon(primaryWeapon());
+      if (weaponStats[currentWeaponId].fireMode === 'Melee' && currentWeaponId !== (callbacks.getMeleeWeapon?.() ?? 'orbiter')) switchWeapon(callbacks.getMeleeWeapon?.() ?? 'orbiter');
       sprintPoseActive = sprinting && active;
       if (
         firing &&
@@ -686,7 +732,7 @@ export function createWeapon(
         );
       }
       const positionBlend = aimingDownSights ? 0.24 : 0.18;
-      if (currentWeaponId === 'orbiter') {
+      if (weaponStats[currentWeaponId].fireMode === 'Melee') {
         const progress = Math.min(1, Math.max(0, (now - swingAt) / 420));
         const swing = Math.sin(progress * Math.PI);
         targetPosition = targetPosition.add(new Vector3(-.65 * swing, .12 * swing, .12 * swing));
@@ -715,6 +761,9 @@ export function createWeapon(
       root.setEnabled(nextActive && currentWeaponId === 'assaultRifle');
       pistolRoot.setEnabled(nextActive && currentWeaponId === 'pistol');
       sniperRoot.setEnabled(nextActive && currentWeaponId === 'sniper');
+      rocketRoot.setEnabled(nextActive && currentWeaponId === 'rocketLauncher');
+      grenadeRoot.setEnabled(nextActive && currentWeaponId === 'grenade');
+      swordRoot.setEnabled(nextActive && currentWeaponId === 'sword');
       orbiterRoot.setEnabled(nextActive && currentWeaponId === 'orbiter');
     },
     reset() {
@@ -728,10 +777,15 @@ export function createWeapon(
       ammoSupplies.assaultRifle.reset();
       ammoSupplies.pistol.reset();
       ammoSupplies.sniper.reset();
+      ammoSupplies.grenade.reset();
+      ammoSupplies.rocketLauncher.reset();
       currentWeaponId = primaryWeapon();
       root.setEnabled(active && currentWeaponId === 'assaultRifle');
       pistolRoot.setEnabled(false);
       sniperRoot.setEnabled(active && currentWeaponId === 'sniper');
+      rocketRoot.setEnabled(active && currentWeaponId === 'rocketLauncher');
+      grenadeRoot.setEnabled(false);
+      swordRoot.setEnabled(false);
       orbiterRoot.setEnabled(false);
       updateHud(false);
     },
@@ -747,6 +801,9 @@ export function createWeapon(
       root.dispose();
       pistolRoot.dispose();
       sniperRoot.dispose();
+      rocketRoot.dispose();
+      grenadeRoot.dispose();
+      swordRoot.dispose();
       orbiterRoot.dispose();
       flashLight.dispose();
     },

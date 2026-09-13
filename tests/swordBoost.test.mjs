@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import { createSwordBoost } from '../game/createSwordBoost.ts';
+const boost = createSwordBoost();
+assert.equal(boost.activate(), true);
+assert.equal(boost.activate(), false);
+boost.update(4.9, true); assert.equal(boost.active, true);
+boost.update(.1 + 1e-9, true); assert.equal(boost.state, 'cooldown');
+assert.equal(boost.activate(), false);
+boost.update(5, true); assert.equal(boost.state, 'ready');
+assert.equal(boost.activate(), true);
+boost.update(0, false); assert.equal(boost.state, 'cooldown');
+assert.equal(boost.activate(), false, 'switching cannot bypass cooldown');
+boost.reset(); assert.equal(boost.state, 'ready');
+console.log('PASS: 5s boost, 5s cooldown, repeated E blocked, switch cancel, reset.');

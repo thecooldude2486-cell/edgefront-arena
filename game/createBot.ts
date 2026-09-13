@@ -14,6 +14,7 @@ import {
   type WeaponId,
 } from './weaponDefinitions';
 import { BOT, COLORS, SPAWNS } from './config';
+import { DIFFICULTIES, type Difficulty } from './difficulty';
 
 type BotCallbacks = {
   onEliminated: () => void;
@@ -34,6 +35,7 @@ export function createBot(
   scene: Scene,
   camera: UniversalCamera,
   callbacks: BotCallbacks,
+  getDifficulty: () => Difficulty = () => 'normal',
 ) {
   // This invisible capsule is both the bot's root and its collision body.
   const root = MeshBuilder.CreateCapsule(
@@ -155,6 +157,10 @@ export function createBot(
   let alive = true;
   let patrolIndex = 0;
   let nextShotAt = performance.now() + 1000;
+  let sawPlayer = false;
+  let attackerPosition: Vector3 | null = null;
+  let alertSeconds = 0;
+  const retaliates = () => ['hard', 'extreme', 'nightmare'].includes(getDifficulty());
   let respawnTimer: ReturnType<typeof setTimeout> | null = null;
   callbacks.onHealthChange(health);
 
@@ -179,10 +185,11 @@ export function createBot(
 
   function fireAtPlayer(now: number, target: Vector3, distance: number) {
     if (now < nextShotAt) return;
-    nextShotAt = now + 520 + Math.random() * 260;
+    const difficulty = DIFFICULTIES[getDifficulty()];
+    nextShotAt = now + difficulty.shotMs + Math.random() * difficulty.jitterMs;
 
     const muzzle = root.position.add(new Vector3(0.33, 0.25, -0.9));
-    const spread = Math.min(1.9, 0.45 + distance * 0.045);
+    const spread = Math.min(1.9, 0.45 + distance * 0.045) * difficulty.spread;
     const error = new Vector3(
       (Math.random() - 0.5) * spread,
       (Math.random() - 0.5) * spread * 0.7,
@@ -216,23 +223,35 @@ export function createBot(
     root.rotation.set(0, SPAWNS.botYaw, 0);
     root.setEnabled(true);
     nextShotAt = performance.now() + 900;
+    sawPlayer = false;
+    attackerPosition = null;
+    alertSeconds = 0;
   }
 
   return {
     root,
     update(deltaSeconds: number, now: number) {
       if (!alive) return;
+      const difficulty = DIFFICULTIES[getDifficulty()];
+      alertSeconds = Math.max(0, alertSeconds - deltaSeconds);
+      const alerted = retaliates() && alertSeconds > 0 && attackerPosition !== null && callbacks.isPlayerAlive();
+      visor.emissiveColor = Color3.FromHexString(difficulty.color).scale(.55);
+      visor.diffuseColor = Color3.FromHexString(difficulty.color);
       const playerPosition = camera.position.clone();
       const flatToPlayer = playerPosition.subtract(root.position);
       flatToPlayer.y = 0;
       const distance = flatToPlayer.length();
       const canSeePlayer =
         callbacks.isPlayerAlive() &&
-        distance < 27 &&
+        (distance < 27 || alerted) &&
         hasLineOfSight(playerPosition);
 
       let moveDirection: Vector3;
+      // Reacquiring the player after cover always requires a fresh reaction.
+      if (canSeePlayer && !sawPlayer) nextShotAt = now + difficulty.reactionMs;
+      sawPlayer = canSeePlayer;
       if (canSeePlayer) {
+        if (alerted) attackerPosition = playerPosition.clone();
         const toward = flatToPlayer.normalize();
         const strafe = new Vector3(-toward.z, 0, toward.x).scale(
           Math.sin(now * 0.0017),
@@ -245,6 +264,12 @@ export function createBot(
               : Vector3.Zero();
         moveDirection = distanceControl.add(strafe.scale(0.72)).normalize();
         fireAtPlayer(now, playerPosition, distance);
+      } else if (alerted && attackerPosition) {
+        // Investigate the last revealed position, not a player hidden by walls.
+        moveDirection = attackerPosition.subtract(root.position);
+        moveDirection.y = 0;
+        if (moveDirection.length() < 1) moveDirection.setAll(0);
+        else moveDirection.normalize();
       } else {
         const patrolTarget = patrolPoints[patrolIndex];
         const toPatrol = patrolTarget.subtract(root.position);
@@ -255,7 +280,7 @@ export function createBot(
       }
 
       if (moveDirection.lengthSquared() > 0.001) {
-        const speed = canSeePlayer ? 2.8 : 2.15;
+        const speed = canSeePlayer ? difficulty.moveSpeed : difficulty.patrolSpeed;
         root.moveWithCollisions(
           new Vector3(
             moveDirection.x * speed * deltaSeconds,
@@ -265,6 +290,10 @@ export function createBot(
         );
         // The bot model faces along its negative local Z axis.
         root.rotation.y = Math.atan2(-moveDirection.x, -moveDirection.z);
+      }
+      if (alerted && attackerPosition) {
+        const facing = attackerPosition.subtract(root.position);
+        root.rotation.y = Math.atan2(-facing.x, -facing.z);
       }
     },
     ownsMesh(mesh: AbstractMesh) {
@@ -280,6 +309,14 @@ export function createBot(
         respawnTimer = setTimeout(respawn, BOT.respawnMs);
         callbacks.onEliminated();
         return true;
+      }
+      if (retaliates() && callbacks.isPlayerAlive()) {
+        // A hit reveals the attacker for six seconds. Further hits refresh
+        // awareness, but do not reset the firing timer (no stun-locking).
+        attackerPosition = camera.position.clone();
+        alertSeconds = 6;
+        const facing = attackerPosition.subtract(root.position);
+        root.rotation.y = Math.atan2(-facing.x, -facing.z);
       }
       return false;
     },

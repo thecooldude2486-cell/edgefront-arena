@@ -1,4 +1,19 @@
 export const WEAPON_DEFINITIONS = {
+  rocketLauncher: {
+    name: 'Comet Launcher', magazineSize: 1, reserveAmmo: 5,
+    bodyDamage: 34, headDamage: 34, directDamage: 67, reloadMs: 2400,
+    fireDelayMs: 1000, fireMode: 'Semi', range: 120,
+  },
+  grenade: {
+    name: 'Pulse Grenade', magazineSize: 1, reserveAmmo: 0,
+    bodyDamage: 34, headDamage: 34, reloadMs: 0,
+    fireDelayMs: 500, fireMode: 'Utility', range: 4,
+  },
+  sword: {
+    name: 'Vector Sword', magazineSize: 0, reserveAmmo: 0,
+    bodyDamage: 20, headDamage: 20, reloadMs: 0,
+    fireDelayMs: 500, fireMode: 'Melee', range: 3,
+  },
   orbiter: {
     name: 'Orbiter', magazineSize: 0, reserveAmmo: 0,
     bodyDamage: 35, headDamage: 35, reloadMs: 0,
@@ -30,7 +45,7 @@ export const WEAPON_DEFINITIONS = {
     name: 'Meridian Sniper',
     magazineSize: 5,
     reserveAmmo: 15,
-    bodyDamage: 70,
+    bodyDamage: 34,
     headDamage: 100,
     reloadMs: 2400,
     fireDelayMs: 1200,
@@ -40,11 +55,13 @@ export const WEAPON_DEFINITIONS = {
 } as const;
 
 export type WeaponId = keyof typeof WEAPON_DEFINITIONS;
-export type PrimaryWeaponId = 'assaultRifle' | 'sniper';
-export type WeaponHitZone = 'body' | 'head';
-export type WeaponHit = 'none' | WeaponHitZone;
+export type PrimaryWeaponId = 'assaultRifle' | 'sniper' | 'rocketLauncher';
+export type MeleeWeaponId = 'sword' | 'orbiter';
+export type WeaponHitZone = 'body' | 'head' | 'direct' | 'splash';
+export type WeaponHit = 'none' | 'body' | 'head';
 
 export function getWeaponDamage(weaponId: WeaponId, hitZone: WeaponHitZone) {
+  if (weaponId === 'rocketLauncher' && hitZone === 'direct') return WEAPON_DEFINITIONS.rocketLauncher.directDamage;
   return WEAPON_DEFINITIONS[weaponId][
     hitZone === 'head' ? 'headDamage' : 'bodyDamage'
   ];

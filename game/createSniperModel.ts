@@ -9,10 +9,10 @@ export function populateSniperModel(scene: Scene, root: TransformNode) {
     surface.specularColor = new Color3(.35, .4, .42);
     return surface;
   }
-  const dark = material('graphite', '#15262d');
-  const shell = material('shell', '#c7dcd5');
-  const green = material('common green', '#88ed8b', .35);
-  const metal = material('metal', '#526a72');
+  const dark = material('graphite', '#182733');
+  const shell = material('pearl shell', '#e9f0f1');
+  const cyan = material('cyan energy rail', '#42e5ff', .45);
+  const metal = material('metal', '#91a4ad');
   function box(name: string, x: number, y: number, z: number, width: number, height: number, depth: number, surface = dark) {
     const mesh = MeshBuilder.CreateBox(`meridian ${name}`, { width, height, depth }, scene);
     mesh.parent = root;
@@ -31,7 +31,13 @@ export function populateSniperModel(scene: Scene, root: TransformNode) {
   }
   box('receiver', 0, 0, .08, .22, .19, .72, shell);
   box('fore-end', 0, -.015, .55, .19, .14, .42);
-  box('green rail', 0, .11, .31, .12, .025, .81, green);
+  box('energy rail', 0, .11, .31, .12, .025, .81, cyan);
+  // Matching pearl armour and recessed vents on both sides.
+  for (const side of [-1, 1]) {
+    box(`fore-end armour ${side}`, side * .10, .005, .52, .025, .16, .39, shell);
+    for (let i = 0; i < 3; i++) box(`vent ${side} ${i}`, side * .115, .015, .43 + i * .085, .008, .065, .025, dark);
+    box(`receiver stripe ${side}`, side * .114, .025, .1, .008, .035, .32, cyan);
+  }
   box('stock spine', 0, -.035, -.47, .12, .10, .42, metal);
   box('cheek rest', 0, .055, -.48, .2, .11, .28, shell);
   box('stock heel', 0, -.055, -.72, .21, .30, .10);
@@ -43,8 +49,9 @@ export function populateSniperModel(scene: Scene, root: TransformNode) {
   tube('scope body', .25, .09, .15, .52, dark);
   tube('scope front', .25, .37, .21, .14, dark);
   tube('scope rear', .25, -.21, .19, .12, dark);
-  tube('scope lens', .25, .447, .17, .01, green);
+  tube('scope lens', .25, .447, .17, .01, cyan);
+  tube('scope pearl collar', .25, .35, .22, .045, shell);
+  tube('barrel energy collar', .015, 1.34, .085, .035, cyan);
   box('scope dial', 0, .35, .1, .095, .085, .095, metal);
-  box('side accent', .114, .025, .1, .008, .07, .32, green);
   root.rotation = Vector3.Zero();
 }

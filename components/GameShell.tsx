@@ -4,10 +4,13 @@ import { useEffect, useRef, useState } from 'react';
 import type { GameHudState } from '@/game/types';
 import type { WeaponId, PrimaryWeaponId } from '@/game/weaponDefinitions';
 import { WeaponShop } from './WeaponShop';
+import { recoverModuleLoad, clearModuleRetry } from '@/game/recoverModuleLoad';
+import { DIFFICULTIES, type Difficulty } from '@/game/difficulty';
 import { createOrbRewards } from '@/game/createOrbRewards';
 import { createOrbWallet, type PurchaseResult } from '@/game/createOrbWallet';
 
 const initialHud: GameHudState = {
+  swordBoostState: 'ready', swordBoostSeconds: 0,
   grappleState: 'idle',
   scoped: false,
   weaponId: 'assaultRifle',
@@ -20,7 +23,6 @@ const initialHud: GameHudState = {
   hitId: 0,
   health: 100,
   maxHealth: 100,
-  regenerating: false,
   botHealth: 100,
   dead: false,
   roundWon: false,
@@ -43,16 +45,25 @@ export function GameShell() {
     'loading',
   );
   const [started, setStarted] = useState(false);
+  const [difficulty, setDifficulty] = useState<Difficulty>('normal');
+  const difficultyRef = useRef<Difficulty>('normal');
   const [shopOpen, setShopOpen] = useState(false);
   const [error, setError] = useState('');
   const [hud, setHud] = useState(initialHud);
   const [orbs, setOrbs] = useState(0);
   const [orbReward, setOrbReward] = useState(0);
   const [orbsSaved, setOrbsSaved] = useState(true);
+  const [rocketOwned, setRocketOwned] = useState(false);
   const [sniperOwned, setSniperOwned] = useState(false);
   const [orbiterOwned, setOrbiterOwned] = useState(false);
   const [orbClicks, setOrbClicks] = useState(0);
   const [primaryWeapon, setPrimaryWeapon] = useState<PrimaryWeaponId>('assaultRifle');
+  const [meleeWeapon, setMeleeWeapon] = useState<'sword' | 'orbiter'>('sword');
+  const meleeRef = useRef<'sword' | 'orbiter'>('sword');
+  function equipMelee(id: 'sword' | 'orbiter') {
+    if (id === 'orbiter' && !orbiterOwned) return;
+    meleeRef.current = id; setMeleeWeapon(id); gameRef.current?.selectWeapon(id);
+  }
   const primaryRef = useRef<PrimaryWeaponId>('assaultRifle');
   const walletRef = useRef<ReturnType<typeof createOrbWallet> | null>(null);
 
@@ -61,11 +72,15 @@ export function GameShell() {
     if (!state) return;
     setOrbs(state.orbs);
     setSniperOwned(state.sniperOwned);
+    setRocketOwned(state.rocketOwned);
     setOrbiterOwned(state.orbiterOwned);
     setOrbClicks(state.orbClicks);
     setOrbsSaved(state.saved);
   }
 
+  function buyRocket(): PurchaseResult {
+    const result = walletRef.current?.buyRocket() ?? 'unavailable'; syncWallet(); return result;
+  }
   function buySniper(): PurchaseResult {
     const result = walletRef.current?.buySniper() ?? 'unavailable';
     syncWallet();
@@ -78,6 +93,7 @@ export function GameShell() {
   }
 
   function equipPrimary(id: PrimaryWeaponId) {
+    if (id === 'rocketLauncher' && !walletRef.current?.state.rocketOwned) return;
     if (id === 'sniper' && !walletRef.current?.state.sniperOwned) return;
     primaryRef.current = id;
     setPrimaryWeapon(id);
@@ -114,9 +130,12 @@ export function GameShell() {
             rewardTimer = setTimeout(() => { pendingReward = 0; setOrbReward(0); }, 3000);
           }
           setHud((current) => ({ ...current, ...update }));
-        }, (id) => id === 'orbiter' ? walletRef.current?.state.orbiterOwned === true : id !== 'sniper' || walletRef.current?.state.sniperOwned === true, () => primaryRef.current);
+        }, (id) => id === 'rocketLauncher' ? walletRef.current?.state.rocketOwned === true : id === 'orbiter' ? walletRef.current?.state.orbiterOwned === true : id !== 'sniper' || walletRef.current?.state.sniperOwned === true, () => primaryRef.current, () => difficultyRef.current, () => meleeRef.current);
         setStatus('ready');
+        clearModuleRetry();
       } catch (caught) {
+        if (cancelled) return;
+        if (recoverModuleLoad(caught)) return;
         console.error(caught);
         setError(
           caught instanceof Error
@@ -197,6 +216,7 @@ export function GameShell() {
             clinging: 'Clinging · Release E / right-click to drop',
             blocked: 'Tether blocked · Release and aim again',
           }[hud.grappleState]}</p>}
+          {hud.weaponId === 'sword' && !hud.paused && !hud.dead && hud.result === 'none' && <p className="grapple-hint">{hud.swordBoostState === 'ready' ? 'E · Speed boost ready' : `${hud.swordBoostState === 'boosting' ? 'Speed boost' : 'Cooldown'} · ${hud.swordBoostSeconds}s`}</p>}
           {hud.hitMarker !== 'none' && (
             <div
               key={hud.hitId}
@@ -218,7 +238,7 @@ export function GameShell() {
                 onClick={() => selectWeapon(primaryWeapon)}
               >
                 <span className="weapon-slot-kind">Primary</span>
-                <strong>{primaryWeapon === 'sniper' ? 'Meridian' : 'Kestrel AR'}</strong>
+                <strong>{primaryWeapon === 'rocketLauncher' ? 'Comet' : primaryWeapon === 'sniper' ? 'Meridian' : 'Kestrel AR'}</strong>
                 <kbd>1</kbd>
               </button>
               <button
@@ -231,22 +251,12 @@ export function GameShell() {
                 <strong>Vesper</strong>
                 <kbd>2</kbd>
               </button>
-              <button type="button" className={`weapon-slot ${hud.weaponId === 'orbiter' ? 'active' : ''} ${!orbiterOwned ? 'empty' : ''}`} disabled={!orbiterOwned} aria-pressed={hud.weaponId === 'orbiter'} onClick={() => selectWeapon('orbiter')} aria-label={orbiterOwned ? 'Equip Orbiter melee' : 'Unlock Orbiter by clicking the shop Orb badge 20 times'}>
-                <span className="weapon-slot-kind">Melee</span><strong>{orbiterOwned ? 'Orbiter' : 'Locked'}</strong><kbd>3</kbd>
+              <button type="button" className={`weapon-slot ${hud.weaponId === meleeWeapon ? 'active' : ''}`} aria-pressed={hud.weaponId === meleeWeapon} onClick={() => selectWeapon(meleeWeapon)}>
+                <span className="weapon-slot-kind">Melee</span><strong>{meleeWeapon === 'sword' ? 'Vector Sword' : 'Orbiter'}</strong><kbd>3</kbd>
               </button>
-              {[4].map((slot) => (
-                <button
-                  key={slot}
-                  type="button"
-                  className="weapon-slot empty"
-                  aria-label={`Weapon slot ${slot} is empty`}
-                  disabled
-                >
-                  <span className="weapon-slot-kind">Slot</span>
-                  <strong>Empty</strong>
-                  <kbd>{slot}</kbd>
-                </button>
-              ))}
+              <button type="button" className={`weapon-slot ${hud.weaponId === 'grenade' ? 'active' : ''}`} aria-pressed={hud.weaponId === 'grenade'} onClick={() => selectWeapon('grenade')}>
+                <span className="weapon-slot-kind">Utility</span><strong>Pulse Grenade</strong><kbd>4</kbd>
+              </button>
             </nav>
           )}
           <div className="ammo-panel">
@@ -255,14 +265,14 @@ export function GameShell() {
               <span className="fire-mode">{hud.fireMode}</span>
             </div>
             <div className="ammo-row">
-              {hud.weaponId === 'orbiter' ? <strong style={{ fontSize: '24px' }}>Melee</strong> : <><strong>{hud.ammo}</strong><span>/ {hud.reserveAmmo}</span></>}
+              {hud.fireMode === 'Melee' ? <strong style={{ fontSize: '24px' }}>Melee</strong> : <><strong>{hud.ammo}</strong><span>/ {hud.reserveAmmo}</span></>}
             </div>
             <div className={`reload-status ${hud.reloading ? 'visible' : ''}`}>
               Reloading
             </div>
           </div>
           <div
-            className={`health-panel ${hud.regenerating ? 'regenerating' : ''}`}
+            className="health-panel"
           >
             <div className="health-heading">
               <span>Vital integrity</span>
@@ -279,7 +289,7 @@ export function GameShell() {
           </div>
           <div className="health-panel bot-health-panel">
             <div className="health-heading">
-              <span>Rook integrity</span>
+              <span>Rook · {DIFFICULTIES[difficulty].label}</span>
               <strong>{hud.botHealth}</strong>
             </div>
             <div className="health-track">
@@ -345,6 +355,19 @@ export function GameShell() {
               Face the Rook training rival in a compact futuristic sports arena.
               The first side to five eliminations wins the match.
             </p>
+            <fieldset className="difficulty-picker">
+              <legend>Rook difficulty</legend>
+              <div className="difficulty-options">
+                {(Object.keys(DIFFICULTIES) as Difficulty[]).map((id) => (
+                  <label key={id} style={{ '--difficulty-color': DIFFICULTIES[id].color } as React.CSSProperties}>
+                    <input type="radio" name="difficulty" value={id} checked={difficulty === id} onChange={() => { difficultyRef.current = id; setDifficulty(id); }} />
+                    <span>{DIFFICULTIES[id].label}</span>
+                  </label>
+                ))}
+              </div>
+              <p aria-live="polite">{DIFFICULTIES[difficulty].description}</p>
+              <small>Rook: 100 HP · Kestrel AR · Same damage on every difficulty</small>
+            </fieldset>
             <div className="controls-row" aria-label="Controls">
               <span className="control-chip">
                 <kbd>WASD</kbd> Move
@@ -358,12 +381,15 @@ export function GameShell() {
               <span className="control-chip">
                 <kbd>Q Toggle / Right click</kbd> Aim guns
               </span>
+              <span className="control-chip"><kbd>Grenade: 4 + Click</kbd> 2s fuse · 34 damage · 4m blast · One per life · No self-damage</span>
+              <span className="control-chip"><kbd>Blast jump</kbd> Explode a grenade or rocket near your feet · WASD steers in air · No self-damage</span>
+              <span className="control-chip"><kbd>Sword: E</kbd> Speed boost 5s · Then cooldown 5s</span>
               <span className="control-chip grapple-control"><kbd>Orbiter: Hold E / Right click</kbd> Aim at solid cover · Pull and cling · Release to drop</span>
               <span className="control-chip">
                 <kbd>R</kbd> Reload
               </span>
               <span className="control-chip">
-                <kbd>1 / 2 / 3</kbd> Primary / Secondary / Melee
+                <kbd>1 / 2 / 3 / 4</kbd> Primary / Secondary / Melee / Grenade
               </span>
               <span className="control-chip">
                 <kbd>Double-tap W</kbd> Sprint
@@ -408,7 +434,7 @@ export function GameShell() {
       )}
 
       {orbReward > 0 && <div className="orb-reward-toast" role="status">+{orbReward} Orbs earned</div>}
-      <WeaponShop open={shopOpen} onOpenChange={setShopOpen} orbs={orbs} orbsSaved={orbsSaved} sniperOwned={sniperOwned} onBuySniper={buySniper} primaryWeapon={primaryWeapon} onEquipPrimary={equipPrimary} orbiterOwned={orbiterOwned} orbClicks={orbClicks} onOrbClick={clickOrb} />
+      <WeaponShop rocketOwned={rocketOwned} onBuyRocket={buyRocket} meleeWeapon={meleeWeapon} onEquipMelee={equipMelee} open={shopOpen} onOpenChange={setShopOpen} orbs={orbs} orbsSaved={orbsSaved} sniperOwned={sniperOwned} onBuySniper={buySniper} primaryWeapon={primaryWeapon} onEquipPrimary={equipPrimary} orbiterOwned={orbiterOwned} orbClicks={orbClicks} onOrbClick={clickOrb} />
       {started && <div className="pause-hint">ESC releases your mouse · Weapon shop in pause menu</div>}
     </main>
   );

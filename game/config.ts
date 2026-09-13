@@ -1,10 +1,8 @@
 import { Vector3 } from '@babylonjs/core/Maths/math.vector';
 import { WEAPON_DEFINITIONS } from './weaponDefinitions';
 
-// Player health regeneration settings. Change these three values to tune it.
+// Shared maximum player health; restored by the existing round/respawn rules.
 export const MAX_HEALTH = 100;
-export const REGEN_DELAY = 5;
-export const REGEN_RATE = 20;
 
 // The values here are the easiest place to tune the feel of the game.
 export const PLAYER = {

@@ -1,6 +1,8 @@
 import type { WeaponId } from './weaponDefinitions';
 
 export type GameHudState = {
+  swordBoostState: string;
+  swordBoostSeconds: number;
   grappleState: import('./createGrapple').GrappleState;
   scoped: boolean;
   weaponId: WeaponId;
@@ -9,11 +11,10 @@ export type GameHudState = {
   ammo: number;
   reserveAmmo: number;
   reloading: boolean;
-  hitMarker: 'none' | 'body' | 'head';
+  hitMarker: 'none' | 'body' | 'head' | 'direct';
   hitId: number;
   health: number;
   maxHealth: number;
-  regenerating: boolean;
   botHealth: number;
   dead: boolean;
   roundWon: boolean;

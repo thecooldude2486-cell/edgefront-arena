@@ -1,6 +1,8 @@
-import { Engine, Scene, Color3, Color4, UniversalCamera, Vector3, TransformNode, HemisphericLight, StandardMaterial, Mesh } from '@babylonjs/core';
+import { Engine, Scene, Color3, Color4, UniversalCamera, Vector3, TransformNode, HemisphericLight, Mesh } from '@babylonjs/core';
 import { populateWeaponModels } from './createWeapon';
 import { populateSniperModel } from './createSniperModel';
+import { populateLauncherModel } from './createRockets';
+import { populateSwordModel } from './createSwordModel';
 import { populateOrbiterModel } from './createOrbiterModel';
 import type { WeaponId } from './weaponDefinitions';
 
@@ -16,10 +18,15 @@ export function createShopPreview(canvas: HTMLCanvasElement, weaponId: WeaponId)
   const rifle = new TransformNode('shop rifle', scene);
   const pistol = new TransformNode('shop pistol', scene);
   const sniper = new TransformNode('shop sniper', scene);
+  const launcher = new TransformNode('shop launcher', scene);
+  populateLauncherModel(scene, launcher); launcher.setEnabled(weaponId === 'rocketLauncher');
+  const sword = new TransformNode('shop sword', scene);
+  populateSwordModel(scene, sword);
+  sword.setEnabled(weaponId === 'sword');
   const orbiter = new TransformNode('shop orbiter', scene);
   populateOrbiterModel(scene, orbiter);
   orbiter.setEnabled(weaponId === 'orbiter');
-  if (weaponId === 'orbiter') { camera.position.set(1.1, .5, -3.4); camera.setTarget(new Vector3(0, .16, 0)); }
+  if (weaponId === 'orbiter' || weaponId === 'sword') { camera.position.set(1.1, .5, -3.4); camera.setTarget(new Vector3(0, .16, 0)); }
   populateWeaponModels(scene, rifle, pistol);
   populateSniperModel(scene, sniper);
   rifle.setEnabled(weaponId === 'assaultRifle');
@@ -27,15 +34,11 @@ export function createShopPreview(canvas: HTMLCanvasElement, weaponId: WeaponId)
   sniper.setEnabled(weaponId === 'sniper');
   if (weaponId === 'sniper') camera.position.scaleInPlace(1.3);
   if (weaponId === 'pistol') camera.position.scaleInPlace(0.64);
-  const shade = new StandardMaterial('shop graphite shade', scene);
-  shade.diffuseColor = Color3.FromHexString('#122633');
-  shade.emissiveColor = Color3.FromHexString('#08131c');
-  shade.specularColor = Color3.FromHexString('#315866');
+  // Show each weapon's actual Edgefront materials, including AR and pistol.
   for (const mesh of scene.meshes) {
-    if (weaponId !== 'sniper' && weaponId !== 'orbiter') mesh.material = shade;
     if (mesh instanceof Mesh) {
       mesh.renderOutline = true;
-      mesh.outlineColor = Color3.FromHexString(weaponId === 'orbiter' ? '#b45cff' : weaponId === 'sniper' ? '#88ed8b' : '#4de7ff');
+      mesh.outlineColor = Color3.FromHexString('#4de7ff');
       mesh.outlineWidth = 0.006;
     }
   }

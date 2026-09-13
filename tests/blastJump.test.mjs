@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import { Vector3 } from '@babylonjs/core';
+import { getBlastImpulse, steerBlast, BLAST_JUMP } from '../game/blastJump.ts';
+const origin = Vector3.Zero();
+const impulse = getBlastImpulse(origin, new Vector3(0, .9, 0), 0);
+assert.ok(impulse.y > 8 && impulse.z > 0, 'floor blast launches up and forward');
+assert.ok(getBlastImpulse(origin, new Vector3(1, 1, 0), 0).x > 0, 'push away from blast');
+assert.equal(getBlastImpulse(origin, new Vector3(0, 5, 0), 0), null);
+assert.ok(getBlastImpulse(origin, new Vector3(0, .9, 0), Math.PI / 2).x > 0);
+const momentum = new Vector3(0, 0, 10);
+assert.deepEqual(steerBlast(momentum, Vector3.Zero(), 1), momentum, 'no input retains momentum');
+assert.ok(steerBlast(momentum, new Vector3(1, 0, 0), .1).x > 0, 'D steers right');
+assert.ok(steerBlast(momentum, new Vector3(0, 0, -1), .1).z < 10, 'S brakes');
+assert.ok(steerBlast(momentum, new Vector3(0, 0, 1), 10).length() <= BLAST_JUMP.maxHorizontalSpeed + 1e-8);
+console.log('PASS: upward/forward impulse, radial direction, range, yaw, momentum, WASD and speed cap.');

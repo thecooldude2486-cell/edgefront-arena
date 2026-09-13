@@ -28,14 +28,16 @@ import {
   MATCH,
   MAX_HEALTH,
   PLAYER,
-  REGEN_DELAY,
-  REGEN_RATE,
   SPAWNS,
 } from './config';
-import { createHealthRegeneration } from './createHealthRegeneration';
 import { createWeapon } from './createWeapon';
 import type { GameHudUpdate } from './types';
+import { createSwordBoost, SWORD_BOOST } from './createSwordBoost';
+import { createRockets } from './createRockets';
+import { getBlastImpulse, steerBlast } from './blastJump';
+import { createGrenades } from './createGrenade';
 import { createBot } from './createBot';
+import type { Difficulty } from './difficulty';
 import { createSlide, SLIDE } from './createSlide';
 import { createGrapple } from './createGrapple';
 
@@ -51,6 +53,8 @@ export function createGame(
   onHudUpdate: (update: GameHudUpdate) => void,
   canUseWeapon: (weaponId: WeaponId) => boolean = (id) => id === 'assaultRifle' || id === 'pistol',
   getPrimaryWeapon: () => PrimaryWeaponId = () => 'assaultRifle',
+  getDifficulty: () => Difficulty = () => 'normal',
+  getMeleeWeapon: () => 'sword' | 'orbiter' = () => 'orbiter',
 ) {
   const engine = new Engine(canvas, true, {
     preserveDrawingBuffer: false,
@@ -146,6 +150,7 @@ export function createGame(
   let horizontalVelocity = Vector3.Zero();
   let verticalVelocity = 0;
   let grounded = true;
+  let blastAirborne = false;
   let jumpQueued = false;
   let currentEyeHeight = PLAYER.eyeHeight;
   let crouchToggled = false;
@@ -153,7 +158,13 @@ export function createGame(
   let sprintArmed = false;
   const slide = createSlide();
 
+  const swordBoost = createSwordBoost();
+  let lastBoostHud = '';
   function resetPlayerPosition() {
+    blastAirborne = false;
+    swordBoost.reset();
+    grenades.clear();
+    rockets.clear();
     grapple.cancel();
     playerCollider.position.set(
       SPAWNS.player.x,
@@ -175,12 +186,6 @@ export function createGame(
 
   let playerHealth = PLAYER.maxHealth;
   let displayedPlayerHealth = PLAYER.maxHealth;
-  let playerRegenerating = false;
-  const healthRegeneration = createHealthRegeneration({
-    maxHealth: MAX_HEALTH,
-    delaySeconds: REGEN_DELAY,
-    ratePerSecond: REGEN_RATE,
-  });
   let playerAlive = true;
   let playerRespawnTimer: ReturnType<typeof setTimeout> | null = null;
   let damageId = 0;
@@ -199,7 +204,6 @@ export function createGame(
   onHudUpdate({
     health: playerHealth,
     maxHealth: MAX_HEALTH,
-    regenerating: false,
     dead: false,
     roundWon: false,
     playerScore,
@@ -216,8 +220,6 @@ export function createGame(
   function restorePlayerHealth() {
     playerHealth = PLAYER.maxHealth;
     displayedPlayerHealth = PLAYER.maxHealth;
-    playerRegenerating = false;
-    healthRegeneration.reset();
   }
 
   function endMatch(result: 'victory' | 'defeat') {
@@ -238,20 +240,16 @@ export function createGame(
       roundWon: false,
       paused: false,
       health: playerHealth,
-      regenerating: false,
       botHealth: BOT.maxHealth,
     });
   }
 
   function damagePlayer(weaponId: WeaponId, hitZone: WeaponHitZone) {
     if (!playerAlive || gameOver) return;
-    healthRegeneration.registerDamage();
-    playerRegenerating = false;
     playerHealth = applyWeaponDamage(playerHealth, weaponId, hitZone);
     displayedPlayerHealth = Math.floor(playerHealth);
     onHudUpdate({
       health: displayedPlayerHealth,
-      regenerating: false,
       damageId: ++damageId,
     });
     if (playerHealth > 0) return;
@@ -277,7 +275,6 @@ export function createGame(
       weapon?.setActive(true);
       onHudUpdate({
         health: playerHealth,
-        regenerating: false,
         botHealth: BOT.maxHealth,
         dead: false,
         roundWon: false,
@@ -315,7 +312,6 @@ export function createGame(
         weapon?.setActive(true);
         onHudUpdate({
           health: playerHealth,
-          regenerating: false,
           botHealth: BOT.maxHealth,
           dead: false,
           roundWon: false,
@@ -326,17 +322,50 @@ export function createGame(
     onHealthChange: (botHealth) => onHudUpdate({ botHealth }),
     onPlayerHit: damagePlayer,
     isPlayerAlive: () => playerAlive,
-  });
+  }, getDifficulty);
 
   const shadows = new ShadowGenerator(1024, keyLight);
   shadows.useBlurExponentialShadowMap = true;
   shadows.blurKernel = 18;
   bot.root.getChildMeshes().forEach((mesh) => shadows.addShadowCaster(mesh));
 
+  function launchPlayerFromBlast(position: Vector3) {
+    if (!playerAlive || gameOver || !grenades.canDamage(position, playerCollider.position)) return;
+    const impulse = getBlastImpulse(position, playerCollider.position, camera.rotation.y);
+    if (!impulse) return;
+    // Release clinging/sliding so these systems cannot overwrite the launch.
+    grapple.cancel(); wasGrappling = false; slide.cancel();
+    crouchToggled = false; jumpQueued = false;
+    horizontalVelocity = steerBlast(horizontalVelocity.add(new Vector3(impulse.x, 0, impulse.z)), Vector3.Zero(), 0);
+    verticalVelocity = Math.max(verticalVelocity, impulse.y);
+    grounded = false; blastAirborne = true;
+  }
+  const grenades = createGrenades(scene, (position) => {
+    if (!matchActive || gameOver || !playerAlive) return;
+    launchPlayerFromBlast(position);
+    if (bot.alive && grenades.canDamage(position, bot.root.position)) {
+      bot.takeDamage('grenade', 'body');
+      onHudUpdate({ hitMarker: 'body', hitId: ++hitId });
+    }
+    // Player-owned explosions never damage their thrower.
+  });
+  const rockets = createRockets(scene, (position, direct) => {
+    if (!matchActive || gameOver || !playerAlive) return;
+    launchPlayerFromBlast(position);
+    const directBot = direct !== null && bot.ownsMesh(direct);
+    if (bot.alive && (directBot || grenades.canDamage(position, bot.root.position))) {
+      bot.takeDamage('rocketLauncher', directBot ? 'direct' : 'splash');
+      onHudUpdate({ hitMarker: directBot ? 'direct' : 'body', hitId: ++hitId });
+    }
+    // Player-owned rockets never damage their shooter.
+  });
   let hitId = 0;
   weapon = createWeapon(scene, camera, canvas, {
     canUseWeapon,
     getPrimaryWeapon,
+    getMeleeWeapon,
+    onFireRocket: (origin, direction) => rockets.fire(origin, direction),
+    onThrowGrenade: (origin, direction) => grenades.throw(origin, direction),
     onScopeChange: (scoped) => onHudUpdate({ scoped }),
     onAmmoChange: (
       ammo,
@@ -383,6 +412,9 @@ export function createGame(
   const pressed = new Set<string>();
 
   const onKeyDown = (event: KeyboardEvent) => {
+    if (event.code === 'KeyE' && !event.repeat && matchActive && playerAlive && !gameOver && document.pointerLockElement === canvas && weapon?.id === 'sword') {
+      event.preventDefault(); swordBoost.activate();
+    }
     pressed.add(event.code);
     if (
       (event.code === 'ShiftLeft' || event.code === 'ShiftRight') &&
@@ -459,31 +491,18 @@ export function createGame(
     const now = performance.now();
     const deltaSeconds = Math.min(engine.getDeltaTime() / 1000, 0.05);
 
-    const regenerated = healthRegeneration.update(
-      playerHealth,
-      deltaSeconds,
-      matchActive && playerAlive && !gameOver,
-    );
-    playerHealth = regenerated.health;
-    const nextDisplayedHealth = Math.floor(playerHealth);
-    if (
-      nextDisplayedHealth !== displayedPlayerHealth ||
-      regenerated.regenerating !== playerRegenerating
-    ) {
-      displayedPlayerHealth = nextDisplayedHealth;
-      playerRegenerating = regenerated.regenerating;
-      onHudUpdate({
-        health: displayedPlayerHealth,
-        regenerating: playerRegenerating,
-      });
-    }
-
     const canMove =
       matchActive &&
       playerAlive &&
       !gameOver &&
       document.pointerLockElement === canvas;
 
+    swordBoost.update(canMove ? deltaSeconds : 0, canMove && weapon?.id === 'sword');
+    const boostHud = swordBoost.state + swordBoost.seconds;
+    if (boostHud !== lastBoostHud) {
+      lastBoostHud = boostHud;
+      onHudUpdate({ swordBoostState: swordBoost.state, swordBoostSeconds: swordBoost.seconds });
+    }
     const grappleVelocity = grapple.update(deltaSeconds);
     if (wasGrappling && !grapple.active) { horizontalVelocity.setAll(0); verticalVelocity = 0; }
     wasGrappling = grapple.active;
@@ -543,7 +562,7 @@ export function createGame(
         : sprinting
           ? PLAYER.sprintSpeed
           : PLAYER.walkSpeed;
-      desiredVelocity = direction.normalize().scale(speed);
+      desiredVelocity = direction.normalize().scale(speed * (swordBoost.active ? SWORD_BOOST.multiplier : 1));
     }
 
     // Acceleration and deceleration make movement responsive without feeling abrupt.
@@ -551,16 +570,19 @@ export function createGame(
       ? PLAYER.groundAcceleration
       : PLAYER.airAcceleration;
     const movementBlend = 1 - Math.exp(-acceleration * deltaSeconds);
-    horizontalVelocity = Vector3.Lerp(
+    if (grapple.active) blastAirborne = false;
+    horizontalVelocity = blastAirborne && !grounded
+      ? steerBlast(horizontalVelocity, desiredVelocity, canMove ? deltaSeconds : 0)
+      : Vector3.Lerp(
       horizontalVelocity,
       desiredVelocity,
       movementBlend,
     );
     if (slide.active) {
       horizontalVelocity.set(
-        slide.direction.x * slide.speed,
+        slide.direction.x * slide.speed * (swordBoost.active ? SWORD_BOOST.multiplier : 1),
         0,
-        slide.direction.z * slide.speed,
+        slide.direction.z * slide.speed * (swordBoost.active ? SWORD_BOOST.multiplier : 1),
       );
     }
 
@@ -604,7 +626,7 @@ export function createGame(
       (mesh) => mesh.checkCollisions && mesh !== playerCollider,
     );
     grounded = verticalVelocity <= 0 && Boolean(groundHit?.hit);
-    if (grounded) verticalVelocity = -0.8;
+    if (grounded) { verticalVelocity = -0.8; blastAirborne = false; }
 
     // Small, smoothed roll: left/right slides lean toward travel; forward
     // slides get a gentler lean. Looking around updates the relative direction.
@@ -635,6 +657,8 @@ export function createGame(
     weapon?.update(now, sprinting);
     grapple.draw();
     if (matchActive && document.pointerLockElement === canvas) {
+      grenades.update(deltaSeconds);
+      rockets.update(deltaSeconds);
       bot.update(deltaSeconds, now);
     }
 
@@ -674,7 +698,6 @@ export function createGame(
       weapon?.setActive(true);
       onHudUpdate({
         health: playerHealth,
-        regenerating: false,
         dead: false,
         roundWon: false,
         playerScore,
@@ -685,6 +708,8 @@ export function createGame(
       requestMouseLock();
     },
     dispose: () => {
+      rockets.dispose();
+      grenades.dispose();
       grapple.dispose();
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);

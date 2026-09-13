@@ -546,8 +546,7 @@ input {
 @media (prefers-reduced-motion: reduce) {
   .score-won-round,
   .score-number-earned,
-  .score-number-earned::after,
-  .health-panel.regenerating .health-track {
+  .score-number-earned::after {
     animation-duration: 1ms;
   }
 }
@@ -646,6 +645,9 @@ input {
 }
 .hit-marker.head i {
   background: var(--coral);
+}
+.hit-marker.direct i {
+  background: #ff3b45;
 }
 
 @keyframes hit-pop {
@@ -917,19 +919,6 @@ input {
   transition: width 180ms ease;
 }
 
-.health-panel.regenerating .health-track {
-  animation: health-regen-glow 1.1s ease-in-out infinite alternate;
-}
-
-@keyframes health-regen-glow {
-  from {
-    box-shadow: 0 0 3px rgba(185, 244, 101, 0.2);
-  }
-  to {
-    box-shadow: 0 0 13px rgba(185, 244, 101, 0.75);
-  }
-}
-
 .health-caption {
   margin-top: 7px;
 }
@@ -1116,3 +1105,14 @@ input {
     grid-template-columns: 1fr;
   }
 }
+.difficulty-picker { border: 1px solid #315260; border-radius: 14px; padding: 16px; margin: 18px 0; background: #091d28; }
+.difficulty-picker legend { color: #42e5ff; font-size: 16px; font-weight: 700; padding: 0 8px; }
+.difficulty-options { display: flex; flex-wrap: wrap; gap: 8px; }
+.difficulty-options label { flex: 1 1 100px; position: relative; cursor: pointer; }
+.difficulty-options input { position: absolute; opacity: 0; width: 100%; height: 100%; }
+.difficulty-options span { display: block; padding: 12px 8px; border: 1px solid #35505e; border-radius: 8px; text-align: center; color: #dcebf0; font-size: 14px; font-weight: 700; transition: background .15s, border-color .15s; }
+.difficulty-options input:checked + span { border-color: var(--difficulty-color); color: var(--difficulty-color); background: #183340; box-shadow: inset 0 -3px var(--difficulty-color); }
+.difficulty-options input:focus-visible + span { outline: 2px solid white; outline-offset: 3px; }
+.difficulty-options label:hover span { background: #21404e; }
+.difficulty-picker p { color: #dcebf0; font-size: 16px; line-height: 1.5; margin: 12px 0 6px; }
+.difficulty-picker small { display: block; font-size: 14px; color: #92acb9; }

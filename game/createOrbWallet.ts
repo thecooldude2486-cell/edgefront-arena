@@ -1,21 +1,22 @@
 import { ORBS_STORAGE_KEY, readOrbBalance } from './createOrbRewards';
 
-export const SNIPER_PRICE = 300;
+export const SNIPER_PRICE = 500;
+export const ROCKET_PRICE = 300;
 export const WALLET_STORAGE_KEY = 'edgefront-arena.wallet.v1';
 export const ORBITER_CLICKS = 20;
-type WalletState = { orbs: number; sniperOwned: boolean; orbClicks: number };
+type WalletState = { orbs: number; sniperOwned: boolean; rocketOwned: boolean; orbClicks: number };
 type WalletStorage = Pick<Storage, 'getItem' | 'setItem'>;
 export type PurchaseResult = 'purchased' | 'owned' | 'insufficient' | 'unavailable';
 
 // Device-local progress: balance and ownership are saved together, never separately.
 export function createOrbWallet(storage?: WalletStorage) {
-  let state: WalletState = { orbs: 0, sniperOwned: false, orbClicks: 0 };
+  let state: WalletState = { orbs: 0, sniperOwned: false, rocketOwned: false, orbClicks: 0 };
   let saved = !!storage;
   try {
     const raw = storage?.getItem(WALLET_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      state = { orbs: readOrbBalance(String(parsed.orbs)), sniperOwned: parsed.sniperOwned === true,
+      state = { orbs: readOrbBalance(String(parsed.orbs)), sniperOwned: parsed.sniperOwned === true, rocketOwned: parsed.rocketOwned === true,
         orbClicks: Math.min(ORBITER_CLICKS, readOrbBalance(String(parsed.orbClicks))) };
     } else {
       // Keep Orbs earned before the sniper/shop purchase update.
@@ -45,6 +46,13 @@ export function createOrbWallet(storage?: WalletStorage) {
       if (!Number.isSafeInteger(amount) || amount <= 0) return;
       state = { ...state, orbs: Math.min(Number.MAX_SAFE_INTEGER, state.orbs + amount) };
       persist(state);
+    },
+    buyRocket(): PurchaseResult {
+      if (state.rocketOwned) return 'owned';
+      if (state.orbs < ROCKET_PRICE) return 'insufficient';
+      const next = { ...state, orbs: state.orbs - ROCKET_PRICE, rocketOwned: true };
+      if (!persist(next)) return 'unavailable';
+      state = next; return 'purchased';
     },
     buySniper(): PurchaseResult {
       if (state.sniperOwned) return 'owned';
