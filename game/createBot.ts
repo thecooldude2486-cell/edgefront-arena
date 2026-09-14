@@ -209,7 +209,7 @@ export function createBot(
     if (error.length() < 0.66) {
       const horizontalError = Math.hypot(error.x, error.z);
       const hitZone: WeaponHitZone =
-        Math.abs(error.y) < 0.18 && horizontalError < 0.3 ? 'head' : 'body';
+        Math.abs(error.y) < 0.12 && horizontalError < 0.19 ? 'head' : 'body';
       callbacks.onPlayerHit('assaultRifle', hitZone);
     }
   }

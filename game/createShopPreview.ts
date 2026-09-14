@@ -2,6 +2,7 @@ import { Engine, Scene, Color3, Color4, UniversalCamera, Vector3, TransformNode,
 import { populateWeaponModels } from './createWeapon';
 import { populateSniperModel } from './createSniperModel';
 import { populateLauncherModel } from './createRockets';
+import { populateGrenadeModel } from './createGrenade';
 import { populateSwordModel } from './createSwordModel';
 import { populateOrbiterModel } from './createOrbiterModel';
 import type { WeaponId } from './weaponDefinitions';
@@ -16,6 +17,12 @@ export function createShopPreview(canvas: HTMLCanvasElement, weaponId: WeaponId)
   camera.fov = 0.64;
   new HemisphericLight('shop light', new Vector3(0, 1, 0), scene).intensity = 0.8;
   const rifle = new TransformNode('shop rifle', scene);
+  const grenade = new TransformNode('shop grenade', scene);
+  populateGrenadeModel(scene, grenade); grenade.setEnabled(weaponId === 'grenade');
+  if (weaponId === 'grenade') {
+    camera.position.set(.7, .35, -.9);
+    camera.setTarget(new Vector3(0, .04, 0));
+  }
   const pistol = new TransformNode('shop pistol', scene);
   const sniper = new TransformNode('shop sniper', scene);
   const launcher = new TransformNode('shop launcher', scene);

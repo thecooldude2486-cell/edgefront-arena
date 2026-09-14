@@ -6,7 +6,7 @@ import type { WeaponId, PrimaryWeaponId } from '@/game/weaponDefinitions';
 import { WeaponShop } from './WeaponShop';
 import { recoverModuleLoad, clearModuleRetry } from '@/game/recoverModuleLoad';
 import { DIFFICULTIES, type Difficulty } from '@/game/difficulty';
-import { createOrbRewards } from '@/game/createOrbRewards';
+import { createOrbRewards, DIFFICULTY_ORB_REWARDS } from '@/game/createOrbRewards';
 import { createOrbWallet, type PurchaseResult } from '@/game/createOrbWallet';
 
 const initialHud: GameHudState = {
@@ -51,7 +51,7 @@ export function GameShell() {
   const [error, setError] = useState('');
   const [hud, setHud] = useState(initialHud);
   const [orbs, setOrbs] = useState(0);
-  const [orbReward, setOrbReward] = useState(0);
+  const [orbReward, setOrbReward] = useState({ total: 0, matchBonus: 0 });
   const [orbsSaved, setOrbsSaved] = useState(true);
   const [rocketOwned, setRocketOwned] = useState(false);
   const [sniperOwned, setSniperOwned] = useState(false);
@@ -107,6 +107,7 @@ export function GameShell() {
     let storage: Storage | undefined;
     let rewardTimer: ReturnType<typeof setTimeout> | undefined;
     let pendingReward = 0;
+    let pendingMatchBonus = 0;
     try {
       storage = window.localStorage;
     } catch { setOrbsSaved(false); }
@@ -119,15 +120,22 @@ export function GameShell() {
         if (!canvasRef.current || cancelled) return;
         gameRef.current = createGame(canvasRef.current, (update) => {
           if (cancelled) return;
-          const earned = rewards.update(update);
+          const earned = rewards.update(update, difficultyRef.current);
           if (earned > 0) {
             walletRef.current?.award(earned);
             syncWallet();
             // The final round and victory arrive separately; combine their popup.
             pendingReward += earned;
-            setOrbReward(pendingReward);
+            if (update.result === 'victory') {
+              pendingMatchBonus += DIFFICULTY_ORB_REWARDS[difficultyRef.current].matchWin;
+            }
+            setOrbReward({ total: pendingReward, matchBonus: pendingMatchBonus });
             clearTimeout(rewardTimer);
-            rewardTimer = setTimeout(() => { pendingReward = 0; setOrbReward(0); }, 3000);
+            rewardTimer = setTimeout(() => {
+              pendingReward = 0;
+              pendingMatchBonus = 0;
+              setOrbReward({ total: 0, matchBonus: 0 });
+            }, 5000);
           }
           setHud((current) => ({ ...current, ...update }));
         }, (id) => id === 'rocketLauncher' ? walletRef.current?.state.rocketOwned === true : id === 'orbiter' ? walletRef.current?.state.orbiterOwned === true : id !== 'sniper' || walletRef.current?.state.sniperOwned === true, () => primaryRef.current, () => difficultyRef.current, () => meleeRef.current);
@@ -367,6 +375,7 @@ export function GameShell() {
               </div>
               <p aria-live="polite">{DIFFICULTIES[difficulty].description}</p>
               <small>Rook: 100 HP · Kestrel AR · Same damage on every difficulty</small>
+              <small>Rewards: +{DIFFICULTY_ORB_REWARDS[difficulty].roundWin} Orbs per round won · +{DIFFICULTY_ORB_REWARDS[difficulty].matchWin} extra match-win bonus</small>
             </fieldset>
             <div className="controls-row" aria-label="Controls">
               <span className="control-chip">
@@ -433,8 +442,13 @@ export function GameShell() {
         </section>
       )}
 
-      {orbReward > 0 && <div className="orb-reward-toast" role="status">+{orbReward} Orbs earned</div>}
-      <WeaponShop rocketOwned={rocketOwned} onBuyRocket={buyRocket} meleeWeapon={meleeWeapon} onEquipMelee={equipMelee} open={shopOpen} onOpenChange={setShopOpen} orbs={orbs} orbsSaved={orbsSaved} sniperOwned={sniperOwned} onBuySniper={buySniper} primaryWeapon={primaryWeapon} onEquipPrimary={equipPrimary} orbiterOwned={orbiterOwned} orbClicks={orbClicks} onOrbClick={clickOrb} />
+      {orbReward.total > 0 && <div className="orb-reward-toast" role="status">
+        +{orbReward.total} Orbs earned
+        <small>{orbReward.matchBonus > 0
+          ? `${orbReward.total > orbReward.matchBonus ? `Round wins +${orbReward.total - orbReward.matchBonus} · ` : ''}Match bonus +${orbReward.matchBonus}`
+          : `Round win reward +${orbReward.total}`}</small>
+      </div>}
+      <WeaponShop difficulty={difficulty} rocketOwned={rocketOwned} onBuyRocket={buyRocket} meleeWeapon={meleeWeapon} onEquipMelee={equipMelee} open={shopOpen} onOpenChange={setShopOpen} orbs={orbs} orbsSaved={orbsSaved} sniperOwned={sniperOwned} onBuySniper={buySniper} primaryWeapon={primaryWeapon} onEquipPrimary={equipPrimary} orbiterOwned={orbiterOwned} orbClicks={orbClicks} onOrbClick={clickOrb} />
       {started && <div className="pause-hint">ESC releases your mouse · Weapon shop in pause menu</div>}
     </main>
   );

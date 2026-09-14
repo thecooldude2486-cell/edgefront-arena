@@ -35,6 +35,7 @@ import type { GameHudUpdate } from './types';
 import { createSwordBoost, SWORD_BOOST } from './createSwordBoost';
 import { createRockets } from './createRockets';
 import { getBlastImpulse, steerBlast } from './blastJump';
+import { classifyBotHit } from './headshots';
 import { createGrenades } from './createGrenade';
 import { createBot } from './createBot';
 import type { Difficulty } from './difficulty';
@@ -383,9 +384,9 @@ export function createGame(
         weaponName,
         fireMode,
       }),
-    onImpact: (mesh, weaponId) => {
+    onImpact: (mesh, weaponId, point) => {
       if (!bot.ownsMesh(mesh)) return 'none';
-      const hitZone = mesh.metadata?.hitZone === 'head' ? 'head' : 'body';
+      const hitZone = classifyBotHit(mesh, point);
       bot.takeDamage(weaponId, hitZone);
       return hitZone;
     },

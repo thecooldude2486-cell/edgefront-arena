@@ -34,7 +34,7 @@ type WeaponCallbacks = {
     weaponName: string,
     fireMode: string,
   ) => void;
-  onImpact: (mesh: AbstractMesh, weaponId: WeaponId) => WeaponHit;
+  onImpact: (mesh: AbstractMesh, weaponId: WeaponId, point: Vector3) => WeaponHit;
   onHitMarker: (kind: Exclude<WeaponHit, 'none'>) => void;
 };
 
@@ -629,7 +629,7 @@ export function createWeapon(
       // Melee uses only the white HUD marker, never bullet impact effects.
       const melee = stats.fireMode === 'Melee';
       if (!melee) showImpact(hit.pickedPoint);
-      const kind = callbacks.onImpact(hit.pickedMesh, currentWeaponId);
+      const kind = callbacks.onImpact(hit.pickedMesh, currentWeaponId, hit.pickedPoint);
       if (kind !== 'none') callbacks.onHitMarker(melee ? 'body' : kind);
     }
   }

@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
 import { WEAPON_DEFINITIONS, type WeaponId, type PrimaryWeaponId } from '@/game/weaponDefinitions';
 
-import { ORB_REWARDS } from '@/game/createOrbRewards';
+import { DIFFICULTY_ORB_REWARDS } from '@/game/createOrbRewards';
+import { DIFFICULTIES, type Difficulty } from '@/game/difficulty';
+import { GRENADE } from '@/game/createGrenade';
 import { ROCKET_PRICE, SNIPER_PRICE, ORBITER_CLICKS, type PurchaseResult } from '@/game/createOrbWallet';
 
 function OrbsBalance({ amount, onClick }: { amount: number; onClick: () => void }) {
@@ -47,7 +49,8 @@ function WeaponPreview({ weaponId, reveal = false, blurred = false, glitched = f
   </div>;
 }
 
-export function WeaponShop({ rocketOwned, onBuyRocket, meleeWeapon, onEquipMelee, open, onOpenChange, orbs, orbsSaved, sniperOwned, onBuySniper, primaryWeapon, onEquipPrimary, orbiterOwned, orbClicks, onOrbClick }: {
+export function WeaponShop({ difficulty, rocketOwned, onBuyRocket, meleeWeapon, onEquipMelee, open, onOpenChange, orbs, orbsSaved, sniperOwned, onBuySniper, primaryWeapon, onEquipPrimary, orbiterOwned, orbClicks, onOrbClick }: {
+  difficulty: Difficulty;
   rocketOwned: boolean; onBuyRocket: () => PurchaseResult;
   meleeWeapon: 'sword' | 'orbiter'; onEquipMelee: (id: 'sword' | 'orbiter') => void;
   open: boolean; onOpenChange: (open: boolean) => void; orbs: number; orbsSaved: boolean;
@@ -81,7 +84,7 @@ export function WeaponShop({ rocketOwned, onBuyRocket, meleeWeapon, onEquipMelee
       <OrbsBalance amount={orbs} onClick={clickOrb} />
       <p className="orbiter-progress" role="status">{orbiterOwned ? 'Orbiter unlocked · Melee slot 3' : `Click the Orb badge: ${orbClicks} / ${ORBITER_CLICKS} · Unlock Orbiter for free`}</p>
       {purchaseError && <p role="alert">{purchaseError}</p>}
-      <p className="shop-orbs-rules">+{ORB_REWARDS.roundWin} per round won · +{ORB_REWARDS.matchWin} match victory bonus<br />
+      <p className="shop-orbs-rules">{DIFFICULTIES[difficulty].label}: +{DIFFICULTY_ORB_REWARDS[difficulty].roundWin} per round won · +{DIFFICULTY_ORB_REWARDS[difficulty].matchWin} match victory bonus<br />
         {orbsSaved ? 'Orbs and unlocks are saved in this browser.' : 'Browser saving unavailable — purchases require saving.'}
       </p>
       <DialogDescription className="shop-description">Choose one primary: Kestrel AR, Meridian Sniper or Comet Launcher. Vesper Pistol is always your secondary. Choose Vector Sword or unlocked Orbiter for melee slot 3.</DialogDescription>
@@ -95,19 +98,19 @@ export function WeaponShop({ rocketOwned, onBuyRocket, meleeWeapon, onEquipMelee
         <button type="button" className="primary-button common-buy" onClick={() => setRevealing(null)}>Continue</button>
       </section> : <div className="shop-layout">
         <nav className="shop-list" aria-label="Shop weapons">
-          {(['assaultRifle', 'sniper', 'rocketLauncher', 'pistol', 'sword', 'orbiter'] as const).map((id) => <button key={id} type="button" className={`shop-item ${id === 'sniper' ? 'common-item' : ''} ${selected === id ? 'selected' : ''}`} aria-pressed={selected === id} onClick={() => { setSelected(id); setPurchaseError(''); }}>
-            <span>{(id === 'orbiter' || id === 'sword') ? 'MELEE' : id === 'pistol' ? 'SECONDARY' : 'PRIMARY'}<kbd>{(id === 'orbiter' || id === 'sword') ? 3 : id === 'pistol' ? 2 : 1}</kbd></span>
-            <strong>{WEAPON_DEFINITIONS[id].name}</strong><small>{id === 'sword' ? meleeWeapon === 'sword' ? 'Equipped' : 'Free · Available' : id === 'orbiter' ? orbiterOwned ? meleeWeapon === 'orbiter' ? 'Equipped' : 'Owned' : `${orbClicks} / 20 clicks` : id === primaryWeapon || id === 'pistol' ? 'Equipped' : id === 'rocketLauncher' ? rocketOwned ? 'Owned' : `${ROCKET_PRICE} Orbs` : id === 'sniper' ? sniperOwned ? 'Common · Owned' : `Common · ${SNIPER_PRICE} Orbs` : 'Available'}</small>
+          {(['assaultRifle', 'sniper', 'rocketLauncher', 'pistol', 'sword', 'orbiter', 'grenade'] as const).map((id) => <button key={id} type="button" className={`shop-item ${id === 'sniper' ? 'common-item' : ''} ${selected === id ? 'selected' : ''}`} aria-pressed={selected === id} onClick={() => { setSelected(id); setPurchaseError(''); }}>
+            <span>{id === 'grenade' ? 'UTILITY' : (id === 'orbiter' || id === 'sword') ? 'MELEE' : id === 'pistol' ? 'SECONDARY' : 'PRIMARY'}<kbd>{id === 'grenade' ? 4 : (id === 'orbiter' || id === 'sword') ? 3 : id === 'pistol' ? 2 : 1}</kbd></span>
+            <strong>{WEAPON_DEFINITIONS[id].name}</strong><small>{id === 'grenade' ? 'Free · Equipped' : id === 'sword' ? meleeWeapon === 'sword' ? 'Equipped' : 'Free · Available' : id === 'orbiter' ? orbiterOwned ? meleeWeapon === 'orbiter' ? 'Equipped' : 'Owned' : `${orbClicks} / 20 clicks` : id === primaryWeapon || id === 'pistol' ? 'Equipped' : id === 'rocketLauncher' ? rocketOwned ? 'Owned' : `${ROCKET_PRICE} Orbs` : id === 'sniper' ? sniperOwned ? 'Common · Owned' : `Common · ${SNIPER_PRICE} Orbs` : 'Available'}</small>
           </button>)}
         </nav>
         <section className="shop-showcase" aria-label={stats.name}>
           <h2>{stats.name}</h2>
           {open && <WeaponPreview key={selected} weaponId={selected} blurred={(selected === 'sniper' && !sniperOwned) || (selected === 'rocketLauncher' && !rocketOwned)} glitched={selected === 'orbiter' && !orbiterOwned} />}
-          <p>{selected === 'rocketLauncher' ? '67 direct hit OR 34 splash damage. 4m blast radius. Cover blocks splash. No self-damage. One click per rocket.' : selected === 'sword' ? '20 damage per swing. E grants +40% movement speed for 5 seconds, then a 5-second cooldown. Switching away ends the boost.' : selected === 'orbiter' ? 'Click to swing. Aim at solid cover; hold E / right-click to grapple and cling. Release to drop. Grapple reach: 35 m.' : selected === 'sniper' ? 'Scoped precision rifle · One click per shot.' : selected === 'assaultRifle' ? 'Automatic rifle · Your frontline weapon.' : 'Semi-automatic pistol · Your backup weapon.'}</p>
+          <p>{selected === 'grenade' ? 'Press 4, then click to throw. The 2-second fuse includes airtime. Cover blocks the blast. No self-damage; explode near your feet to blast jump.' : selected === 'rocketLauncher' ? '67 direct hit OR 34 splash damage. 4m blast radius. Cover blocks splash. No self-damage. One click per rocket.' : selected === 'sword' ? '20 damage per swing. E grants +40% movement speed for 5 seconds, then a 5-second cooldown. Switching away ends the boost.' : selected === 'orbiter' ? 'Click to swing. Aim at solid cover; hold E / right-click to grapple and cling. Release to drop. Grapple reach: 35 m.' : selected === 'sniper' ? 'Scoped precision rifle · One click per shot.' : selected === 'assaultRifle' ? 'Automatic rifle · Your frontline weapon.' : 'Semi-automatic pistol · Your backup weapon.'}</p>
         </section>
         <section className="shop-overview" aria-label="Weapon stats">
           <h3>Overview</h3>
-          <dl>{(stats.fireMode === 'Melee' ? [['Damage', `${stats.bodyDamage} HP`], ['Reach', `${stats.range} metres`], ['Swing delay', `${stats.fireDelayMs / 1000}s`], ['Ammo', 'Not needed']] : [
+          <dl>{(selected === 'grenade' ? [['AoE damage', `${stats.bodyDamage} HP`], ['Blast radius', `${GRENADE.radius} metres`], ['Fuse', `${GRENADE.fuse} seconds`], ['Per life', `${stats.magazineSize}`], ['Restock', 'On respawn'], ['Self-damage', 'None']] : stats.fireMode === 'Melee' ? [['Damage', `${stats.bodyDamage} HP`], ['Reach', `${stats.range} metres`], ['Swing delay', `${stats.fireDelayMs / 1000}s`], ['Ammo', 'Not needed']] : [
             [selected === 'rocketLauncher' ? 'Splash damage' : 'Body damage', `${stats.bodyDamage} HP`],
             [selected === 'rocketLauncher' ? 'Direct hit' : 'Head damage', `${selected === 'rocketLauncher' ? WEAPON_DEFINITIONS.rocketLauncher.directDamage : stats.headDamage} HP`],
             ['Magazine', `${stats.magazineSize}`],
@@ -116,7 +119,7 @@ export function WeaponShop({ rocketOwned, onBuyRocket, meleeWeapon, onEquipMelee
             ['Fire rate', `${Number((1000 / stats.fireDelayMs).toFixed(2))} / sec`],
             ['Fire mode', stats.fireMode === 'Auto' ? 'Automatic' : 'Semi-auto'],
           ]).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
-          {selected === 'rocketLauncher' && !rocketOwned ? <button type="button" className="primary-button common-buy" disabled={orbs < ROCKET_PRICE} onClick={() => { const result = onBuyRocket(); setPurchaseError(result === 'unavailable' ? 'Could not save. No Orbs spent.' : result === 'insufficient' ? 'Not enough Orbs.' : ''); }}>Unlock · {ROCKET_PRICE} Orbs</button> : selected === 'sword' || selected === 'orbiter' ? <button type="button" className="primary-button shop-equip" disabled={meleeWeapon === selected || (selected === 'orbiter' && !orbiterOwned)} onClick={() => onEquipMelee(selected)}>{selected === 'orbiter' && !orbiterOwned ? 'Unlock with 20 Orb clicks' : meleeWeapon === selected ? 'Melee equipped' : 'Equip melee'}</button> : selected === 'sniper' && !sniperOwned ? <div className="shop-purchase">
+          {selected === 'grenade' ? <span className="shop-available">Free · Equipped in utility slot 4</span> : selected === 'rocketLauncher' && !rocketOwned ? <button type="button" className="primary-button common-buy" disabled={orbs < ROCKET_PRICE} onClick={() => { const result = onBuyRocket(); setPurchaseError(result === 'unavailable' ? 'Could not save. No Orbs spent.' : result === 'insufficient' ? 'Not enough Orbs.' : ''); }}>Unlock · {ROCKET_PRICE} Orbs</button> : selected === 'sword' || selected === 'orbiter' ? <button type="button" className="primary-button shop-equip" disabled={meleeWeapon === selected || (selected === 'orbiter' && !orbiterOwned)} onClick={() => onEquipMelee(selected)}>{selected === 'orbiter' && !orbiterOwned ? 'Unlock with 20 Orb clicks' : meleeWeapon === selected ? 'Melee equipped' : 'Equip melee'}</button> : selected === 'sniper' && !sniperOwned ? <div className="shop-purchase">
             <span className="common-badge">Common</span>
             <button type="button" className="primary-button common-buy" disabled={orbs < SNIPER_PRICE} onClick={purchase}>Unlock · {SNIPER_PRICE} Orbs</button>
             {orbs < SNIPER_PRICE && <p>Earn {SNIPER_PRICE - orbs} more Orbs to unlock.</p>}
@@ -124,7 +127,7 @@ export function WeaponShop({ rocketOwned, onBuyRocket, meleeWeapon, onEquipMelee
           </div> : selected === 'pistol' ? <span className="shop-available">Equipped · Secondary slot 2</span> : <button type="button" className={`primary-button shop-equip ${selected === 'sniper' ? 'common-buy' : ''}`} disabled={primaryWeapon === selected} onClick={() => { if (selected === 'rocketLauncher' || selected === 'sniper' || selected === 'assaultRifle') onEquipPrimary(selected); }}>{primaryWeapon === selected ? 'Primary equipped' : 'Equip primary'}</button>}
         </section>
       </div>}
-      {!revealing && <footer className="shop-footer"><span>1 = Chosen primary · 2 = Vesper Pistol · 3 = Chosen melee</span><DialogClose className="primary-button">Back</DialogClose></footer>}
+      {!revealing && <footer className="shop-footer"><span>1 = Chosen primary · 2 = Vesper Pistol · 3 = Chosen melee · 4 = Pulse Grenade</span><DialogClose className="primary-button">Back</DialogClose></footer>}
     </DialogContent>
   </Dialog>;
 }

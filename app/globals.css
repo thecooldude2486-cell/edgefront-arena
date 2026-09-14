@@ -478,7 +478,8 @@ input {
 }
 
 /* Keep reward messages below the score instead of covering it. */
-.orb-reward-toast { top: 96px; }
+.orb-reward-toast { top: 96px; text-align: center; width: max-content; max-width: calc(100vw - 24px); }
+.orb-reward-toast small { display: block; margin-top: 4px; font-size: 12px; font-weight: 500; color: #e9f7ff; }
 @media (max-width: 560px) {
   .scoreboard { top: 54px; }
   .orb-reward-toast { top: 130px; }
