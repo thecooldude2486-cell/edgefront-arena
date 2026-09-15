@@ -1,5 +1,7 @@
 'use client';
 
+import './LaserQuest.css'; // Keep the collectible HUD styles with this component.
+
 import { useEffect, useRef, useState } from 'react';
 import type { GameHudState } from '@/game/types';
 import type { WeaponId, PrimaryWeaponId } from '@/game/weaponDefinitions';
@@ -10,6 +12,8 @@ import { createOrbRewards, DIFFICULTY_ORB_REWARDS } from '@/game/createOrbReward
 import { createOrbWallet, type PurchaseResult } from '@/game/createOrbWallet';
 
 const initialHud: GameHudState = {
+  nearbyLaserPart: null, laserPartsCount: 0, laserUnlocked: false, laserProgressSaved: true, laserNotice: '',
+  lobbyStation: null,
   swordBoostState: 'ready', swordBoostSeconds: 0,
   grappleState: 'idle',
   scoped: false,
@@ -34,12 +38,15 @@ const initialHud: GameHudState = {
 };
 
 export function GameShell() {
+  const [setupOpen, setSetupOpen] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameRef = useRef<{
     dispose: () => void;
     requestPointerLock: () => void;
     selectWeapon: (weaponId: WeaponId) => void;
     playAgain: () => void;
+    enterLobby: () => void;
+    interactLobby: () => void;
   } | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>(
     'loading',
@@ -138,7 +145,10 @@ export function GameShell() {
             }, 5000);
           }
           setHud((current) => ({ ...current, ...update }));
-        }, (id) => id === 'rocketLauncher' ? walletRef.current?.state.rocketOwned === true : id === 'orbiter' ? walletRef.current?.state.orbiterOwned === true : id !== 'sniper' || walletRef.current?.state.sniperOwned === true, () => primaryRef.current, () => difficultyRef.current, () => meleeRef.current);
+        }, (id) => id === 'rocketLauncher' ? walletRef.current?.state.rocketOwned === true : id === 'orbiter' ? walletRef.current?.state.orbiterOwned === true : id !== 'sniper' || walletRef.current?.state.sniperOwned === true, () => primaryRef.current, () => difficultyRef.current, () => meleeRef.current, (station) => {
+          if (station === 'armory') setShopOpen(true);
+          else setSetupOpen(true);
+        });
         setStatus('ready');
         clearModuleRetry();
       } catch (caught) {
@@ -165,7 +175,14 @@ export function GameShell() {
   function enterArena() {
     if (status !== 'ready') return;
     setStarted(true);
-    gameRef.current?.requestPointerLock();
+    setSetupOpen(false);
+    gameRef.current?.playAgain();
+  }
+
+  function returnToLobby() {
+    gameRef.current?.enterLobby();
+    setStarted(false);
+    setSetupOpen(false);
   }
 
   function playAgain() {
@@ -320,6 +337,7 @@ export function GameShell() {
           {hud.paused && hud.result === 'none' && !hud.dead && (
             <section className="pause-screen" aria-labelledby="pause-title">
               <p>Match paused</p>
+              <button className="primary-button shop-open-button" onClick={returnToLobby}>Return to lobby</button>
               <h2 id="pause-title">Cursor released</h2>
               <button className="primary-button shop-open-button" type="button" onClick={() => setShopOpen(true)}>Weapon shop</button>
               <button
@@ -337,6 +355,7 @@ export function GameShell() {
               aria-labelledby="match-result-title"
             >
               <p>Match complete</p>
+              <button className="primary-button shop-open-button" onClick={returnToLobby}>Return to lobby</button>
               <h2 id="match-result-title">
                 {hud.result === 'victory' ? 'Victory' : 'Defeat'}
               </h2>
@@ -352,9 +371,32 @@ export function GameShell() {
         </div>
       )}
 
-      {!started && (
+      {!started && !setupOpen && (
+        <section className="lobby-hud" aria-label="Edgefront lobby">
+          <div className="lobby-heading"><p>CONCOURSE / 01</p><h1>Edgefront Atrium</h1><span>Armory ↖ · Duel deck ↑ · Lounge ↗</span></div>
+          <div className="lobby-orbs">◈ {orbs} <span>ORBS</span></div>
+          <div className={`laser-quest ${hud.laserUnlocked ? 'complete' : ''}`} aria-live="polite">
+            <span>SECRET PROJECT / LASER CANNON</span>
+            <strong>{hud.laserUnlocked ? 'Unlocked · Weapon coming later' : `${hud.laserPartsCount} / 5 parts recovered`}</strong>
+            {hud.laserNotice && <small key={hud.laserNotice}>{hud.laserNotice}</small>}
+            {!hud.laserProgressSaved && <small>Progress is session-only: browser saving is unavailable.</small>}
+          </div>
+          <div className="lobby-actions">
+            {hud.nearbyLaserPart && <button className="lobby-interact" onClick={() => gameRef.current?.interactLobby()}><kbd>E</kbd><span>Collect {hud.nearbyLaserPart}<small>Laser cannon component</small></span></button>}
+            {!hud.nearbyLaserPart && hud.lobbyStation && <button className="lobby-interact" onClick={() => gameRef.current?.interactLobby()}><kbd>E</kbd><span>{hud.lobbyStation === 'armory' ? 'Open armory' : 'Enter duel deck'}<small>{hud.lobbyStation === 'armory' ? 'Weapons & loadout' : 'Choose difficulty · Start a match'}</small></span></button>}
+            {!hud.nearbyLaserPart && !hud.lobbyStation && <p>Walk to a glowing terminal · Press E nearby to interact</p>}
+            {status === 'ready' && hud.paused && <button className="primary-button shop-open-button" onClick={() => gameRef.current?.requestPointerLock()}>Click to explore</button>}
+            {status === 'loading' && <p>Preparing atrium…</p>}
+            <p className="lobby-controls">WASD move · Mouse look · E interact · Esc cursor</p>
+            {status === 'error' && <div className="error-message" role="alert">{error}<button className="primary-button" onClick={() => window.location.reload()}>Reload game</button></div>}
+          </div>
+        </section>
+      )}
+
+      {!started && setupOpen && (
         <section className="start-screen" aria-labelledby="game-title">
           <div className="start-card">
+            <button className="primary-button shop-open-button" onClick={() => setSetupOpen(false)}>Back to lobby</button>
             <p className="eyebrow">1v1 training protocol</p>
             <h1 id="game-title">
               Edgefront <span>Arena</span>
@@ -378,6 +420,7 @@ export function GameShell() {
               <small>Rewards: +{DIFFICULTY_ORB_REWARDS[difficulty].roundWin} Orbs per round won · +{DIFFICULTY_ORB_REWARDS[difficulty].matchWin} extra match-win bonus</small>
             </fieldset>
             <div className="controls-row" aria-label="Controls">
+              <span className="control-chip"><kbd>Lobby: E</kbd> Open a nearby Armory or Duel deck terminal</span>
               <span className="control-chip">
                 <kbd>WASD</kbd> Move
               </span>

@@ -1,0 +1,6 @@
+/* Self-contained styling for the optional lobby scavenger hunt. */
+.laser-quest { position: absolute; left: 24px; top: 185px; max-width: 290px; padding: 10px 14px; border-left: 2px solid #92f3b5; background: #102432d9; }
+.laser-quest > span { display: block; font-size: 9px; letter-spacing: .12em; color: #92f3b5; }
+.laser-quest strong { display: block; margin-top: 5px; font-size: 12px; }
+.laser-quest small { display: block; margin-top: 6px; font-size: 11px; color: #c6e7d5; }
+.laser-quest.complete { border-color: #d2ffe1; box-shadow: 0 0 18px #92f3b522; }

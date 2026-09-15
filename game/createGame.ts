@@ -23,6 +23,9 @@ import {
   type PrimaryWeaponId,
 } from './weaponDefinitions';
 import { createArena } from './createArena';
+import { createLobby, LOBBY_SPAWN } from './createLobby';
+import { nearbyLobbyStation, type LobbyStationId } from './lobbyStations';
+import { createLaserPartsProgress } from './laserParts';
 import {
   BOT,
   MATCH,
@@ -56,6 +59,7 @@ export function createGame(
   getPrimaryWeapon: () => PrimaryWeaponId = () => 'assaultRifle',
   getDifficulty: () => Difficulty = () => 'normal',
   getMeleeWeapon: () => 'sword' | 'orbiter' = () => 'orbiter',
+  onLobbyInteract: (station: LobbyStationId) => void = () => {},
 ) {
   const engine = new Engine(canvas, true, {
     preserveDrawingBuffer: false,
@@ -126,6 +130,15 @@ export function createGame(
   glow.intensity = 0.36;
 
   const arena = createArena(scene);
+  const lobby = createLobby(scene);
+  let partsStorage: Storage | undefined;
+  try { partsStorage = window.localStorage; } catch { /* Session-only collection if browser storage is blocked. */ }
+  const laserParts = createLaserPartsProgress(partsStorage);
+  lobby.secrets.setCollected(laserParts.state.found);
+  onHudUpdate({ laserPartsCount: laserParts.state.count, laserUnlocked: laserParts.state.unlocked, laserProgressSaved: laserParts.state.saved });
+  let lastNearbyPart: string | null = null;
+  let inLobby = true;
+  let lastLobbyStation: LobbyStationId | null = null;
   // Keep the empty scoreboard screens free of stadium glow.
   arena.scoreMeshes.forEach((mesh) => glow.addExcludedMesh(mesh));
   const playerCollider = MeshBuilder.CreateCapsule(
@@ -168,11 +181,11 @@ export function createGame(
     rockets.clear();
     grapple.cancel();
     playerCollider.position.set(
-      SPAWNS.player.x,
+      inLobby ? LOBBY_SPAWN.x : SPAWNS.player.x,
       PLAYER.colliderHalfHeight,
-      SPAWNS.player.z,
+      inLobby ? LOBBY_SPAWN.z : SPAWNS.player.z,
     );
-    camera.position.copyFrom(SPAWNS.player);
+    camera.position.copyFrom(inLobby ? LOBBY_SPAWN : SPAWNS.player);
     camera.rotation.set(0, SPAWNS.playerYaw, 0);
     horizontalVelocity.setAll(0);
     verticalVelocity = 0;
@@ -198,7 +211,7 @@ export function createGame(
   let gameOver = false;
   const grapple = createGrapple(scene, camera, canvas, playerCollider,
     PLAYER.colliderHalfHeight + .25,
-    () => matchActive && playerAlive && !gameOver && weapon?.id === 'orbiter' && canUseWeapon('orbiter'),
+    () => !inLobby && matchActive && playerAlive && !gameOver && weapon?.id === 'orbiter' && canUseWeapon('orbiter'),
     (mesh) => mesh.checkCollisions && mesh !== playerCollider && mesh !== bot?.root && mesh.metadata?.owner !== 'bot',
     (grappleState) => onHudUpdate({ grappleState }));
   let wasGrappling = false;
@@ -246,7 +259,7 @@ export function createGame(
   }
 
   function damagePlayer(weaponId: WeaponId, hitZone: WeaponHitZone) {
-    if (!playerAlive || gameOver) return;
+    if (inLobby || !playerAlive || gameOver) return;
     playerHealth = applyWeaponDamage(playerHealth, weaponId, hitZone);
     displayedPlayerHealth = Math.floor(playerHealth);
     onHudUpdate({
@@ -286,7 +299,7 @@ export function createGame(
 
   bot = createBot(scene, camera, {
     onEliminated: () => {
-      if (gameOver) return;
+      if (inLobby || gameOver) return;
       playerScore += 1;
       if (playerScore >= MATCH.scoreToWin) {
         onHudUpdate({ playerScore });
@@ -396,7 +409,7 @@ export function createGame(
   // A subtle dome keeps the horizon clean without requiring downloaded assets.
   const sky = MeshBuilder.CreateSphere(
     'arena sky',
-    { diameter: 180, segments: 20, sideOrientation: Mesh.BACKSIDE },
+    { diameter: 360, segments: 20, sideOrientation: Mesh.BACKSIDE },
     scene,
   );
   const skyMaterial = scene
@@ -412,8 +425,37 @@ export function createGame(
 
   const pressed = new Set<string>();
 
+  function interactLobby() {
+    if (!inLobby) return;
+    const part = lobby.secrets.nearby(camera.position);
+    if (part && laserParts.collect(part.id)) {
+      const progress = laserParts.state;
+      lobby.secrets.setCollected(progress.found);
+      onHudUpdate({
+        nearbyLaserPart: null, laserPartsCount: progress.count,
+        laserUnlocked: progress.unlocked, laserProgressSaved: progress.saved,
+        laserNotice: progress.unlocked ? 'Laser cannon unlocked! Weapon coming later.' : `${part.name} recovered · ${progress.count}/5 parts`,
+      });
+      return;
+    }
+    const station = nearbyLobbyStation(playerCollider.position);
+    if (!station) return;
+    // Pause exploration before opening UI. E never also activates a weapon.
+    matchActive = false;
+    pressed.clear();
+    camera.detachControl();
+    if (document.pointerLockElement === canvas) document.exitPointerLock();
+    onHudUpdate({ paused: true });
+    onLobbyInteract(station.id);
+  }
+
   const onKeyDown = (event: KeyboardEvent) => {
-    if (event.code === 'KeyE' && !event.repeat && matchActive && playerAlive && !gameOver && document.pointerLockElement === canvas && weapon?.id === 'sword') {
+    if (inLobby && event.code === 'KeyE') {
+      if (!event.repeat && document.pointerLockElement === canvas) interactLobby();
+      event.preventDefault();
+      return;
+    }
+    if (event.code === 'KeyE' && !event.repeat && !inLobby && matchActive && playerAlive && !gameOver && document.pointerLockElement === canvas && weapon?.id === 'sword') {
       event.preventDefault(); swordBoost.activate();
     }
     pressed.add(event.code);
@@ -491,6 +533,17 @@ export function createGame(
   scene.onBeforeRenderObservable.add(() => {
     const now = performance.now();
     const deltaSeconds = Math.min(engine.getDeltaTime() / 1000, 0.05);
+    if (inLobby) lobby.update(now);
+    const nearbyPart = inLobby ? lobby.secrets.nearby(camera.position)?.name ?? null : null;
+    if (nearbyPart !== lastNearbyPart) {
+      lastNearbyPart = nearbyPart;
+      onHudUpdate({ nearbyLaserPart: nearbyPart });
+    }
+    const station = inLobby ? nearbyLobbyStation(playerCollider.position)?.id ?? null : null;
+    if (station !== lastLobbyStation) {
+      lastLobbyStation = station;
+      onHudUpdate({ lobbyStation: station });
+    }
 
     const canMove =
       matchActive &&
@@ -657,7 +710,7 @@ export function createGame(
     }
     weapon?.update(now, sprinting);
     grapple.draw();
-    if (matchActive && document.pointerLockElement === canvas) {
+    if (!inLobby && matchActive && document.pointerLockElement === canvas) {
       grenades.update(deltaSeconds);
       rockets.update(deltaSeconds);
       bot.update(deltaSeconds, now);
@@ -669,13 +722,34 @@ export function createGame(
     }
   });
 
+  function enterLobby() {
+    if (playerRespawnTimer) clearTimeout(playerRespawnTimer);
+    playerRespawnTimer = null;
+    inLobby = true;
+    gameOver = false;
+    matchActive = true; // Enables exploration, not combat.
+    playerAlive = true;
+    restorePlayerHealth();
+    resetPlayerPosition();
+    pressed.clear();
+    weapon?.reset();
+    weapon?.setActive(false);
+    bot.reset(); // Cancels any pending round-respawn timer before hiding Rook.
+    bot.root.setEnabled(false);
+    camera.detachControl();
+    if (document.pointerLockElement === canvas) document.exitPointerLock();
+    onHudUpdate({ result: 'none', dead: false, roundWon: false, paused: true, scoped: false, health: playerHealth, lobbyStation: null });
+  }
+  enterLobby();
   engine.runRenderLoop(() => scene.render());
   const onResize = () => engine.resize();
   window.addEventListener('resize', onResize);
 
   return {
+    enterLobby,
+    interactLobby,
     selectWeapon: (weaponId: WeaponId) => {
-      if (gameOver || !playerAlive) return;
+      if (inLobby || gameOver || !playerAlive) return;
       weapon?.selectWeapon(weaponId);
     },
     requestPointerLock: () => {
@@ -684,6 +758,8 @@ export function createGame(
       requestMouseLock();
     },
     playAgain: () => {
+      inLobby = false;
+      bot.root.setEnabled(true);
       if (playerRespawnTimer) clearTimeout(playerRespawnTimer);
       playerRespawnTimer = null;
       restorePlayerHealth();

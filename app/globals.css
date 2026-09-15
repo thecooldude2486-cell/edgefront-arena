@@ -478,6 +478,26 @@ input {
 }
 
 /* Keep reward messages below the score instead of covering it. */
+.lobby-hud { position: fixed; inset: 0; pointer-events: none; color: #e9f7ff; }
+.lobby-heading { position: absolute; top: 68px; left: 24px; padding: 10px 16px; border-left: 2px solid #35d5ea; background: linear-gradient(90deg, #071926ce, #07192600); }
+.lobby-heading p { color: #35d5ea; letter-spacing: .2em; font-size: 12px; }
+.lobby-heading h1 { font-size: 22px; margin: 6px 0; }
+.lobby-heading span { color: #c1d6de; }
+.lobby-orbs { position: absolute; right: 5%; top: 28px; padding: 12px 22px; background: #102735ed; border: 1px solid #35d5ea; border-radius: 30px; color: #35d5ea; font-size: 22px; font-weight: 800; }
+.lobby-orbs span { font-size: 12px; letter-spacing: .15em; }
+.lobby-actions { position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); width: min(500px, 94%); text-align: center; pointer-events: none; }
+.lobby-actions p { margin: 8px 0; color: #e1e9e9; font-size: 13px; line-height: 1.6; text-shadow: 0 2px 5px #071926; }
+.lobby-actions button { pointer-events: auto; }
+.lobby-controls { font-size: 11px !important; letter-spacing: .06em; }
+.lobby-interact { display: inline-flex; align-items: center; gap: 16px; padding: 14px 24px; border: 1px solid #74e3ef; border-radius: 12px; color: #e9f7ff; background: #102432ec; text-align: left; box-shadow: 0 8px 32px #00131a66; animation: lobby-prompt-in .2s ease-out; }
+.lobby-interact kbd { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 8px; background: #d8f9fd; color: #102432; font-size: 22px; font-weight: 900; }
+.lobby-interact span { font-weight: 700; font-size: 18px; }
+.lobby-interact small { display: block; margin-top: 4px; font-size: 12px; color: #afc8d6; font-weight: 400; }
+@keyframes lobby-prompt-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .lobby-interact { animation: none; } }
+.lobby-actions .primary-button { font-size: 16px; padding: 14px 20px; margin: 4px; min-height: 0; }
+.lobby-actions .shop-open-button { margin-top: 4px; }
+@media (max-width: 600px) { .lobby-heading { top: 64px; left: 3%; padding: 10px; } .lobby-actions { bottom: 10px; padding: 10px; } .lobby-actions .primary-button { font-size: 13px; padding: 10px; } }
 .orb-reward-toast { top: 96px; text-align: center; width: max-content; max-width: calc(100vw - 24px); }
 .orb-reward-toast small { display: block; margin-top: 4px; font-size: 12px; font-weight: 500; color: #e9f7ff; }
 @media (max-width: 560px) {

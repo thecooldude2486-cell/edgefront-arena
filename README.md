@@ -16,6 +16,38 @@ Open `http://localhost:3000` in a normal desktop web browser. Press `Control + C
 
 ## Controls
 
+### Secret laser-cannon project
+
+Five hidden components can be collected with **E** in the lobby. Collection
+progress saves in this browser, separately from Orbs. Collecting all five marks
+the laser cannon unlocked; there is no usable cannon or new weapon slot yet.
+The localhost and live websites have separate browser saves.
+
+Spoilers (directions assume you face the Duel deck from spawn):
+
+1. **Power cell (obvious):** pedestal beside the Armory terminal.
+2. **Focus lens (obvious):** on the Recovery Lounge's round table.
+3. **Magnetic coil (secret room):** walk through the left outer wall beside the rear of the Armory (world x=-27, z=-105), then go around the interior partition.
+4. **Emitter assembly (secret room):** walk through the right outer wall behind the Recovery Lounge (x=27, z=-104), then go around the partition.
+5. **Energy regulator (secret room):** walk through the rear wall to the right of the Duel gateway (x=14, z=-89), then go around the partition.
+
+The three false walls look solid but allow walking both ways. The rooms have
+solid floors, ceilings, and outer walls; their interiors are lit and the exits
+are marked on the inside. Collecting through walls is blocked. Old discoveries
+remain saved even though the components have moved.
+
+You start in a safe 3D atrium. Click **Click to explore**, then use WASD.
+Walk to the violet **Armory** terminal on the left and press **E** to shop.
+Walk to the cyan **Duel deck** terminal ahead and press **E** for difficulty
+and match setup. A nearby prompt appears within 3.8 metres; E works on a
+keyboard with either a mouse or touchpad. Press **Esc** during a match
+and choose **Return to lobby** to leave it; this ends your current match.
+You can also return after a victory or defeat. The lobby has no combat or rewards.
+
+`game/createLobby.ts` builds the lobby floor, walls, seating, plants, and signs.
+`game/createGame.ts` handles moving between lobby and arena without changing
+the arena map. `components/GameShell.tsx` contains the lobby buttons.
+
 - `W A S D` — move
 - Move the mouse or touchpad to look around
 - Tap left click for one shot; only the AR fires continuously while held

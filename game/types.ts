@@ -1,6 +1,12 @@
 import type { WeaponId } from './weaponDefinitions';
 
 export type GameHudState = {
+  nearbyLaserPart: string | null;
+  laserPartsCount: number;
+  laserUnlocked: boolean;
+  laserProgressSaved: boolean;
+  laserNotice: string;
+  lobbyStation: import('./lobbyStations').LobbyStationId | null;
   swordBoostState: string;
   swordBoostSeconds: number;
   grappleState: import('./createGrapple').GrappleState;
