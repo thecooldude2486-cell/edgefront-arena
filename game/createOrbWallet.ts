@@ -1,6 +1,6 @@
 import { ORBS_STORAGE_KEY, readOrbBalance } from './createOrbRewards';
 
-export const SNIPER_PRICE = 500;
+export const SNIPER_PRICE = 750;
 export const ROCKET_PRICE = 300;
 export const WALLET_STORAGE_KEY = 'edgefront-arena.wallet.v1';
 export const ORBITER_CLICKS = 20;

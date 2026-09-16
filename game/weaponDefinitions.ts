@@ -1,4 +1,9 @@
 export const WEAPON_DEFINITIONS = {
+  laserCannon: {
+    name: 'Helion Laser Cannon', magazineSize: 100, reserveAmmo: 0,
+    bodyDamage: 6, headDamage: 8, reloadMs: 0,
+    fireDelayMs: 100, fireMode: 'Beam', range: 90,
+  },
   rocketLauncher: {
     name: 'Comet Launcher', magazineSize: 1, reserveAmmo: 5,
     bodyDamage: 34, headDamage: 34, directDamage: 67, reloadMs: 2400,
@@ -55,7 +60,7 @@ export const WEAPON_DEFINITIONS = {
 } as const;
 
 export type WeaponId = keyof typeof WEAPON_DEFINITIONS;
-export type PrimaryWeaponId = 'assaultRifle' | 'sniper' | 'rocketLauncher';
+export type PrimaryWeaponId = 'assaultRifle' | 'sniper' | 'rocketLauncher' | 'laserCannon';
 export type MeleeWeaponId = 'sword' | 'orbiter';
 export type WeaponHitZone = 'body' | 'head' | 'direct' | 'splash';
 export type WeaponHit = 'none' | 'body' | 'head';

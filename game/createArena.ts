@@ -8,6 +8,7 @@ import {
   Vector3,
 } from '@babylonjs/core';
 import { COLORS } from './config';
+import { createDestructibleCover } from './createDestructibleCover';
 
 function material(scene: Scene, name: string, hex: string, emissive = 0) {
   const value = new StandardMaterial(name, scene);
@@ -91,6 +92,10 @@ export function createArena(scene: Scene) {
   scoreMaterial.disableLighting = true;
   scoreMaterial.specularColor = Color3.Black();
   const scoreMeshes: Mesh[] = [];
+  const coverMeshes: Mesh[] = [];
+  function breakableBox(...args: Parameters<typeof arenaBox>) {
+    const mesh = arenaBox(...args); coverMeshes.push(mesh); return mesh;
+  }
 
   // A wide foundation makes the arena feel like one intentional structure.
   arenaBox(
@@ -224,7 +229,7 @@ export function createArena(scene: Scene) {
     [8.5, 6, -0.3],
   ] as const;
   coverPositions.forEach(([x, z, rotation], index) => {
-    arenaBox(
+    breakableBox(
       scene,
       `centre cover ${index}`,
       new Vector3(x, 1.25, z),
@@ -254,7 +259,7 @@ export function createArena(scene: Scene) {
         lime,
       );
     }
-    arenaBox(
+    breakableBox(
       scene,
       `${side} side cover`,
       new Vector3(x, 3.4, 0),
@@ -284,14 +289,14 @@ export function createArena(scene: Scene) {
   }
 
   // Low centre barriers interrupt long sightlines without closing the arena.
-  arenaBox(
+  breakableBox(
     scene,
     'centre north barrier',
     new Vector3(0, 0.8, 7.7),
     { width: 6, height: 1.6, depth: 0.7 },
     coral,
   );
-  arenaBox(
+  breakableBox(
     scene,
     'centre south barrier',
     new Vector3(0, 0.8, -7.7),
@@ -646,6 +651,7 @@ export function createArena(scene: Scene) {
   );
 
   return {
+    cover: createDestructibleCover(scene, coverMeshes),
     scoreMeshes,
     materials: {
       dark,

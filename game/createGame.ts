@@ -243,6 +243,7 @@ export function createGame(
     playerAlive = true;
     resetPlayerPosition();
     bot.reset();
+    arena.cover.reset();
     weapon?.setActive(false);
     camera.detachControl();
     if (document.pointerLockElement === canvas) {
@@ -283,6 +284,7 @@ export function createGame(
       playerAlive = true;
       resetPlayerPosition();
       bot.reset();
+      arena.cover.reset();
       if (document.pointerLockElement === canvas)
         camera.attachControl(canvas, true);
       weapon?.reset();
@@ -320,6 +322,7 @@ export function createGame(
         playerAlive = true;
         resetPlayerPosition();
         bot.reset();
+        arena.cover.reset();
         if (document.pointerLockElement === canvas)
           camera.attachControl(canvas, true);
         weapon?.reset();
@@ -375,7 +378,7 @@ export function createGame(
   });
   let hitId = 0;
   weapon = createWeapon(scene, camera, canvas, {
-    canUseWeapon,
+    canUseWeapon: (id) => id === 'laserCannon' ? laserParts.state.unlocked : canUseWeapon(id),
     getPrimaryWeapon,
     getMeleeWeapon,
     onFireRocket: (origin, direction) => rockets.fire(origin, direction),
@@ -398,6 +401,7 @@ export function createGame(
         fireMode,
       }),
     onImpact: (mesh, weaponId, point) => {
+      if (!inLobby && matchActive && playerAlive && !gameOver && arena.cover.hit(mesh, weaponId, point)) return 'none';
       if (!bot.ownsMesh(mesh)) return 'none';
       const hitZone = classifyBotHit(mesh, point);
       bot.takeDamage(weaponId, hitZone);
@@ -434,7 +438,7 @@ export function createGame(
       onHudUpdate({
         nearbyLaserPart: null, laserPartsCount: progress.count,
         laserUnlocked: progress.unlocked, laserProgressSaved: progress.saved,
-        laserNotice: progress.unlocked ? 'Laser cannon unlocked! Weapon coming later.' : `${part.name} recovered · ${progress.count}/5 parts`,
+        laserNotice: progress.unlocked ? 'Helion Laser Cannon unlocked! Equip it in the Armory.' : `${part.name} recovered · ${progress.count}/5 parts`,
       });
       return;
     }
@@ -712,6 +716,7 @@ export function createGame(
     grapple.draw();
     if (!inLobby && matchActive && document.pointerLockElement === canvas) {
       grenades.update(deltaSeconds);
+      arena.cover.update(deltaSeconds);
       rockets.update(deltaSeconds);
       bot.update(deltaSeconds, now);
     }
@@ -735,6 +740,7 @@ export function createGame(
     weapon?.reset();
     weapon?.setActive(false);
     bot.reset(); // Cancels any pending round-respawn timer before hiding Rook.
+    arena.cover.reset();
     bot.root.setEnabled(false);
     camera.detachControl();
     if (document.pointerLockElement === canvas) document.exitPointerLock();
@@ -771,6 +777,7 @@ export function createGame(
       resetPlayerPosition();
       camera.attachControl(canvas, true);
       bot.reset();
+      arena.cover.reset();
       weapon?.reset();
       weapon?.setActive(true);
       onHudUpdate({
@@ -785,6 +792,7 @@ export function createGame(
       requestMouseLock();
     },
     dispose: () => {
+      arena.cover.dispose();
       rockets.dispose();
       grenades.dispose();
       grapple.dispose();

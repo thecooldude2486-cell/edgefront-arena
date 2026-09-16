@@ -9,7 +9,7 @@ registerHooks({ resolve(specifier, context, nextResolve) {
   }
   return nextResolve(specifier, context);
 } });
-const { createOrbWallet, WALLET_STORAGE_KEY } = await import('../game/createOrbWallet.ts');
+const { createOrbWallet, WALLET_STORAGE_KEY, SNIPER_PRICE } = await import('../game/createOrbWallet.ts');
 const { ORBS_STORAGE_KEY } = await import('../game/createOrbRewards.ts');
 const { WEAPON_DEFINITIONS, applyWeaponDamage } = await import('../game/weaponDefinitions.ts');
 const { createWeaponAmmo } = await import('../game/createWeaponAmmo.ts');
@@ -17,9 +17,10 @@ function storage(balance) {
   const values = new Map([[ORBS_STORAGE_KEY, String(balance)]]);
   return { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) };
 }
-const poor = createOrbWallet(storage(499));
+assert.equal(SNIPER_PRICE, 750);
+const poor = createOrbWallet(storage(749));
 assert.equal(poor.buySniper(), 'insufficient');
-assert.equal(poor.state.orbs, 499);
+assert.equal(poor.state.orbs, 749);
 const legacy = storage(0);
 legacy.setItem(WALLET_STORAGE_KEY, JSON.stringify({ orbs: 25, sniperOwned: true, orbClicks: 0 }));
 const existingOwner = createOrbWallet(legacy);
@@ -27,7 +28,8 @@ assert.equal(existingOwner.state.sniperOwned, true);
 assert.equal(existingOwner.buySniper(), 'owned');
 assert.equal(existingOwner.state.orbs, 25, 'Existing owners are not charged the price difference');
 assert.equal(createOrbWallet(storage(300)).buySniper(), 'insufficient');
-const save = storage(500);
+assert.equal(createOrbWallet(storage(500)).buySniper(), 'insufficient');
+const save = storage(750);
 const wallet = createOrbWallet(save);
 assert.equal(wallet.buySniper(), 'purchased');
 assert.deepEqual(wallet.state, { orbs: 0, sniperOwned: true, rocketOwned: false, orbClicks: 0, orbiterOwned: false, saved: true });
@@ -36,13 +38,13 @@ wallet.award(10);
 assert.equal(wallet.state.orbs, 10);
 assert.deepEqual(createOrbWallet(save).state, wallet.state);
 assert.equal(JSON.parse(save.getItem(WALLET_STORAGE_KEY)).sniperOwned, true);
-const failed = createOrbWallet({ getItem: (key) => key === ORBS_STORAGE_KEY ? '600' : null, setItem() { throw Error('Storage blocked'); } });
+const failed = createOrbWallet({ getItem: (key) => key === ORBS_STORAGE_KEY ? '800' : null, setItem() { throw Error('Storage blocked'); } });
 assert.equal(failed.buySniper(), 'unavailable');
-assert.equal(failed.state.orbs, 600);
+assert.equal(failed.state.orbs, 800);
 assert.equal(failed.state.sniperOwned, false);
 assert.equal(createOrbWallet(storage('bad')).state.orbs, 0);
 assert.equal(createOrbWallet().buySniper(), 'insufficient');
-const spare = createOrbWallet(storage(550));
+const spare = createOrbWallet(storage(800));
 assert.equal(spare.buySniper(), 'purchased');
 assert.equal(spare.state.orbs, 50);
 
@@ -241,7 +243,8 @@ assert.equal(clickWallet.state.orbClicks, 19, 'click progress survives refresh')
 assert.equal(clickWallet.clickOrb(), 'unlocked');
 assert.equal(clickWallet.clickOrb(), 'owned', 'repeated clicks cannot replay unlock');
 assert.equal(clickWallet.state.orbs, 450, 'click unlock never spends currency');
-clickWallet.buySniper();
+clickWallet.award(300);
+assert.equal(clickWallet.buySniper(), 'purchased');
 assert.equal(createOrbWallet(clickSave).state.orbiterOwned, true, 'sniper purchase preserves Orbiter');
 assert.equal(failed.clickOrb(), 'unavailable');
 assert.equal(failed.state.orbClicks, 0);

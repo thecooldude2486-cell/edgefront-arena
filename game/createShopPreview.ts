@@ -5,6 +5,7 @@ import { populateLauncherModel } from './createRockets';
 import { populateGrenadeModel } from './createGrenade';
 import { populateSwordModel } from './createSwordModel';
 import { populateOrbiterModel } from './createOrbiterModel';
+import { populateLaserModel } from './createLaserModel';
 import type { WeaponId } from './weaponDefinitions';
 
 // Display-only scene. No input listeners, ammo, or combat logic are created here.
@@ -17,6 +18,8 @@ export function createShopPreview(canvas: HTMLCanvasElement, weaponId: WeaponId)
   camera.fov = 0.64;
   new HemisphericLight('shop light', new Vector3(0, 1, 0), scene).intensity = 0.8;
   const rifle = new TransformNode('shop rifle', scene);
+  const laser = new TransformNode('shop laser', scene);
+  populateLaserModel(scene, laser); laser.setEnabled(weaponId === 'laserCannon');
   const grenade = new TransformNode('shop grenade', scene);
   populateGrenadeModel(scene, grenade); grenade.setEnabled(weaponId === 'grenade');
   if (weaponId === 'grenade') {

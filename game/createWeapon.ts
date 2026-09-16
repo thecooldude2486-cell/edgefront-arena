@@ -18,6 +18,8 @@ import { populateLauncherModel } from './createRockets';
 import { populateGrenadeModel } from './createGrenade';
 import { populateSwordModel } from './createSwordModel';
 import { populateOrbiterModel } from './createOrbiterModel';
+import { populateLaserModel } from './createLaserModel';
+import { createLaserEnergy } from './createLaserEnergy';
 
 type WeaponCallbacks = {
   onFireRocket?: (origin: Vector3, direction: Vector3) => void;
@@ -48,6 +50,7 @@ function weaponMaterial(scene: Scene, name: string, hex: string, emissive = 0) {
 
 function createShotSound() {
   let context: AudioContext | null = null;
+  let laserTone: OscillatorNode | null = null;
 
   function ensureContext() {
     context ??= new AudioContext();
@@ -56,6 +59,15 @@ function createShotSound() {
   }
 
   return {
+    setLaser(on: boolean) {
+      if (!on) { laserTone?.stop(); laserTone = null; return; }
+      if (laserTone) return;
+      const audio = ensureContext();
+      laserTone = audio.createOscillator();
+      const gain = audio.createGain(); gain.gain.value = .025;
+      laserTone.type = 'triangle'; laserTone.frequency.value = 210;
+      laserTone.connect(gain).connect(audio.destination); laserTone.start();
+    },
     playSwing() {
       const audio = ensureContext();
       const now = audio.currentTime;
@@ -103,6 +115,7 @@ function createShotSound() {
       }
     },
     dispose() {
+      laserTone?.stop(); laserTone = null;
       void context?.close();
     },
   };
@@ -333,6 +346,9 @@ export function createWeapon(
   populateWeaponModels(scene, root, pistolRoot);
   pistolRoot.setEnabled(false);
   const sniperRoot = new TransformNode('meridian sniper root', scene);
+  const laserRoot = new TransformNode('helion laser root', scene);
+  laserRoot.parent = camera; populateLaserModel(scene, laserRoot);
+  laserRoot.position.set(.44, -.35, .8); laserRoot.setEnabled(false);
   sniperRoot.parent = camera;
   populateSniperModel(scene, sniperRoot);
   sniperRoot.position.set(.42, -.38, .88);
@@ -375,7 +391,28 @@ export function createWeapon(
 
   const impactMaterial = weaponMaterial(scene, 'impact spark', '#dffaff', 0.9);
   const audio = createShotSound();
+  const laserEnergy = createLaserEnergy();
+  const beam = MeshBuilder.CreateBox('helion beam', { width: .035, height: .035, depth: 1 }, scene);
+  beam.material = weaponMaterial(scene, 'helion beam light', '#a5ffd2', 1);
+  beam.isPickable = false; beam.setEnabled(false);
+  let beamUntil = -Infinity;
+  let lastUpdateAt = performance.now();
+  let lastEnergyHud = '';
+  function stopBeam() { beam.setEnabled(false); beamUntil = -Infinity; audio.setLaser(false); }
+  function drawBeam(now: number) {
+    if (now >= beamUntil) { beam.setEnabled(false); audio.setLaser(false); return; }
+    const ray = camera.getForwardRay(WEAPON_DEFINITIONS.laserCannon.range);
+    const hit = scene.pickWithRay(ray, mesh => mesh.isPickable && mesh.isEnabled() && mesh.isVisible);
+    const end = hit?.pickedPoint ?? ray.origin.add(ray.direction.scale(ray.length));
+    laserRoot.computeWorldMatrix(true);
+    const muzzle = Vector3.TransformCoordinates(new Vector3(0, 0, 1.06), laserRoot.getWorldMatrix());
+    const start = Vector3.Distance(ray.origin, end) < 2 ? ray.origin : muzzle;
+    beam.position.copyFrom(Vector3.Center(start, end));
+    beam.scaling.z = Math.max(.01, Vector3.Distance(start, end));
+    beam.lookAt(end); beam.setEnabled(true); audio.setLaser(true);
+  }
   const weaponStats = {
+    laserCannon: WEAPON_DEFINITIONS.laserCannon,
     rocketLauncher: WEAPON_DEFINITIONS.rocketLauncher,
     grenade: WEAPON_DEFINITIONS.grenade,
     assaultRifle: WEAPON,
@@ -385,6 +422,7 @@ export function createWeapon(
     orbiter: WEAPON_DEFINITIONS.orbiter,
   };
   const weaponRoots = {
+    laserCannon: laserRoot,
     rocketLauncher: rocketRoot,
     grenade: grenadeRoot,
     assaultRifle: root,
@@ -394,6 +432,7 @@ export function createWeapon(
     orbiter: orbiterRoot,
   };
   const weaponPoses = {
+    laserCannon: { hipPosition: new Vector3(.44, -.35, .8), hipRotation: Vector3.Zero(), aimPosition: new Vector3(0, -.29, .7), aimRotation: Vector3.Zero(), sprintPosition: new Vector3(.4, -.48, .7), sprintRotation: new Vector3(.14, -.12, .08), muzzlePosition: new Vector3(0, 0, 1.06) },
     rocketLauncher: { hipPosition: new Vector3(.44, -.35, .85), hipRotation: Vector3.Zero(), aimPosition: new Vector3(0, -.24, .65), aimRotation: Vector3.Zero(), sprintPosition: new Vector3(.45, -.5, .8), sprintRotation: new Vector3(.1, -.1, .1), muzzlePosition: new Vector3(0, 0, .67) },
     grenade: { hipPosition: new Vector3(.4, -.3, .7), hipRotation: Vector3.Zero(), aimPosition: new Vector3(.4, -.3, .7), aimRotation: Vector3.Zero(), sprintPosition: new Vector3(.4, -.4, .6), sprintRotation: Vector3.Zero(), muzzlePosition: Vector3.Zero() },
     sword: {
@@ -436,6 +475,7 @@ export function createWeapon(
     },
   };
   const ammoSupplies = {
+    laserCannon: laserEnergy,
     rocketLauncher: createWeaponAmmo(1, 5),
     grenade: createWeaponAmmo(1, 0),
     assaultRifle: createWeaponAmmo(WEAPON.magazineSize, WEAPON.reserveAmmo),
@@ -445,6 +485,7 @@ export function createWeapon(
     orbiter: createWeaponAmmo(0, 0),
   };
   const lastShotAt: Record<WeaponId, number> = {
+    laserCannon: -Infinity,
     rocketLauncher: -Infinity,
     grenade: -Infinity,
     assaultRifle: -Infinity,
@@ -474,9 +515,9 @@ export function createWeapon(
     const ammo = ammoSupplies[currentWeaponId].state;
     const stats = weaponStats[currentWeaponId];
     callbacks.onAmmoChange(
-      ammo.magazine,
+      currentWeaponId === 'laserCannon' ? Math.floor(ammo.magazine) : ammo.magazine,
       ammo.reserve,
-      isReloading,
+      currentWeaponId === 'laserCannon' ? laserEnergy.state.charging : isReloading,
       currentWeaponId,
       stats.name,
       stats.fireMode,
@@ -493,6 +534,7 @@ export function createWeapon(
     if (nextWeaponId === currentWeaponId || !active) return;
     if (nextWeaponId !== 'grenade' && nextWeaponId !== 'pistol' && nextWeaponId !== (callbacks.getMeleeWeapon?.() ?? 'orbiter') && nextWeaponId !== primaryWeapon()) return;
     if (callbacks.canUseWeapon && !callbacks.canUseWeapon(nextWeaponId)) return;
+    stopBeam();
     setScoped(false);
     cancelReload();
     swingAt = -Infinity;
@@ -526,6 +568,7 @@ export function createWeapon(
   }
 
   function reload() {
+    if (currentWeaponId === 'laserCannon') return;
     if (weaponStats[currentWeaponId].fireMode === 'Melee') return;
     const stats = weaponStats[currentWeaponId];
     const ammoSupply = ammoSupplies[currentWeaponId];
@@ -568,18 +611,22 @@ export function createWeapon(
       now - lastShotAt[currentWeaponId] < stats.fireDelayMs
     )
       return;
-    if (weaponStats[currentWeaponId].fireMode !== 'Melee' && ammoSupply.state.magazine <= 0) {
+    if (currentWeaponId !== 'laserCannon' && weaponStats[currentWeaponId].fireMode !== 'Melee' && ammoSupply.state.magazine <= 0) {
       reload();
       return;
     }
 
+    if (currentWeaponId === 'laserCannon' && !laserEnergy.fire()) { stopBeam(); return; }
     lastShotAt[currentWeaponId] = now;
     if (currentWeaponId === 'grenade') {
       ammoSupply.fire(); updateHud(false);
       callbacks.onThrowGrenade?.(camera.position.clone(), camera.getForwardRay().direction.clone());
       return;
     }
-    if (weaponStats[currentWeaponId].fireMode === 'Melee') {
+    if (currentWeaponId === 'laserCannon') {
+      beamUntil = now + stats.fireDelayMs + 25;
+      updateHud(false);
+    } else if (weaponStats[currentWeaponId].fireMode === 'Melee') {
       swingAt = now;
       audio.playSwing();
     } else {
@@ -623,12 +670,12 @@ export function createWeapon(
     const ray = camera.getForwardRay(stats.range);
     const hit = scene.pickWithRay(
       ray,
-      (mesh) => mesh.isPickable && !mesh.name.startsWith('kestrel'),
+      (mesh) => mesh.isPickable && !mesh.name.startsWith('kestrel') && (currentWeaponId !== 'laserCannon' || (mesh.isEnabled() && mesh.isVisible)),
     );
     if (hit?.hit && hit.pickedPoint && hit.pickedMesh) {
       // Melee uses only the white HUD marker, never bullet impact effects.
       const melee = stats.fireMode === 'Melee';
-      if (!melee) showImpact(hit.pickedPoint);
+      if (!melee && currentWeaponId !== 'laserCannon') showImpact(hit.pickedPoint);
       const kind = callbacks.onImpact(hit.pickedMesh, currentWeaponId, hit.pickedPoint);
       if (kind !== 'none') callbacks.onHitMarker(melee ? 'body' : kind);
     }
@@ -637,7 +684,9 @@ export function createWeapon(
   const onPointerDown = (event: PointerEvent) => {
     if (document.pointerLockElement !== canvas || !active) return;
     if (event.button === 0) {
-      if (weaponStats[currentWeaponId].fireMode !== 'Auto') {
+      if (currentWeaponId === 'laserCannon') {
+        firing = true; shoot(performance.now()); drawBeam(performance.now());
+      } else if (weaponStats[currentWeaponId].fireMode !== 'Auto') {
         // Semi-automatic fire: one pointer press can produce only one shot.
         shoot(performance.now());
       } else {
@@ -647,7 +696,7 @@ export function createWeapon(
     if (event.button === 2 && currentWeaponId !== 'grenade' && weaponStats[currentWeaponId].fireMode !== 'Melee' && !(currentWeaponId === 'sniper' && reloading)) pointerAiming = true;
   };
   const onPointerUp = (event: PointerEvent) => {
-    if (event.button === 0) firing = false;
+    if (event.button === 0) { firing = false; stopBeam(); }
     if (event.button === 2) pointerAiming = false;
   };
   const onContextMenu = (event: MouseEvent) => event.preventDefault();
@@ -676,6 +725,7 @@ export function createWeapon(
   };
   const onPointerLockChange = () => {
     if (document.pointerLockElement !== canvas) {
+      stopBeam();
       firing = false;
       pointerAiming = false;
       keyboardAiming = false;
@@ -692,15 +742,25 @@ export function createWeapon(
     selectWeapon: switchWeapon,
     get id() { return currentWeaponId; },
     update(now: number, sprinting: boolean) {
+      const seconds = Math.min(.05, Math.max(0, (now - lastUpdateAt) / 1000));
+      lastUpdateAt = now;
+      if (active && document.pointerLockElement === canvas) laserEnergy.update(seconds, currentWeaponId === 'laserCannon' && firing);
       if (currentWeaponId !== 'grenade' && currentWeaponId !== 'pistol' && weaponStats[currentWeaponId].fireMode !== 'Melee' && currentWeaponId !== primaryWeapon()) switchWeapon(primaryWeapon());
       if (weaponStats[currentWeaponId].fireMode === 'Melee' && currentWeaponId !== (callbacks.getMeleeWeapon?.() ?? 'orbiter')) switchWeapon(callbacks.getMeleeWeapon?.() ?? 'orbiter');
       sprintPoseActive = sprinting && active;
       if (
         firing &&
         active &&
-        weaponStats[currentWeaponId].fireMode === 'Auto'
+        document.pointerLockElement === canvas &&
+        (weaponStats[currentWeaponId].fireMode === 'Auto' || currentWeaponId === 'laserCannon')
       )
         shoot(now);
+      if (active && currentWeaponId === 'laserCannon' && firing && document.pointerLockElement === canvas) drawBeam(now);
+      else stopBeam();
+      if (currentWeaponId === 'laserCannon') {
+        const energyHud = `${Math.floor(laserEnergy.state.magazine)}:${laserEnergy.state.charging}`;
+        if (energyHud !== lastEnergyHud) { lastEnergyHud = energyHud; updateHud(); }
+      }
       const aimingDownSights =
         (pointerAiming || keyboardAiming) && active && !sprintPoseActive &&
         !(currentWeaponId === 'sniper' && reloading);
@@ -752,6 +812,7 @@ export function createWeapon(
       camera.fov += (targetFov - camera.fov) * 0.16;
     },
     setActive(nextActive: boolean) {
+      stopBeam();
       setScoped(false);
       active = nextActive;
       firing = false;
@@ -765,8 +826,10 @@ export function createWeapon(
       grenadeRoot.setEnabled(nextActive && currentWeaponId === 'grenade');
       swordRoot.setEnabled(nextActive && currentWeaponId === 'sword');
       orbiterRoot.setEnabled(nextActive && currentWeaponId === 'orbiter');
+      laserRoot.setEnabled(nextActive && currentWeaponId === 'laserCannon');
     },
     reset() {
+      stopBeam(); laserEnergy.reset(); lastUpdateAt = performance.now(); lastShotAt.laserCannon = -Infinity;
       swingAt = -Infinity;
       setScoped(false);
       cancelReload();
@@ -780,6 +843,7 @@ export function createWeapon(
       ammoSupplies.grenade.reset();
       ammoSupplies.rocketLauncher.reset();
       currentWeaponId = primaryWeapon();
+      laserRoot.setEnabled(active && currentWeaponId === 'laserCannon');
       root.setEnabled(active && currentWeaponId === 'assaultRifle');
       pistolRoot.setEnabled(false);
       sniperRoot.setEnabled(active && currentWeaponId === 'sniper');
@@ -790,6 +854,7 @@ export function createWeapon(
       updateHud(false);
     },
     dispose() {
+      stopBeam(); beam.dispose(); laserRoot.dispose();
       if (reloadTimer) clearTimeout(reloadTimer);
       if (flashTimer) clearTimeout(flashTimer);
       canvas.removeEventListener('pointerdown', onPointerDown);

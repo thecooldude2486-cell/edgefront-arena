@@ -100,6 +100,7 @@ export function GameShell() {
   }
 
   function equipPrimary(id: PrimaryWeaponId) {
+    if (id === 'laserCannon' && !hud.laserUnlocked) return;
     if (id === 'rocketLauncher' && !walletRef.current?.state.rocketOwned) return;
     if (id === 'sniper' && !walletRef.current?.state.sniperOwned) return;
     primaryRef.current = id;
@@ -263,7 +264,7 @@ export function GameShell() {
                 onClick={() => selectWeapon(primaryWeapon)}
               >
                 <span className="weapon-slot-kind">Primary</span>
-                <strong>{primaryWeapon === 'rocketLauncher' ? 'Comet' : primaryWeapon === 'sniper' ? 'Meridian' : 'Kestrel AR'}</strong>
+                <strong>{primaryWeapon === 'laserCannon' ? 'Helion' : primaryWeapon === 'rocketLauncher' ? 'Comet' : primaryWeapon === 'sniper' ? 'Meridian' : 'Kestrel AR'}</strong>
                 <kbd>1</kbd>
               </button>
               <button
@@ -290,9 +291,10 @@ export function GameShell() {
               <span className="fire-mode">{hud.fireMode}</span>
             </div>
             <div className="ammo-row">
-              {hud.fireMode === 'Melee' ? <strong style={{ fontSize: '24px' }}>Melee</strong> : <><strong>{hud.ammo}</strong><span>/ {hud.reserveAmmo}</span></>}
+              {hud.weaponId === 'laserCannon' ? <><strong>{hud.ammo}%</strong><span>ENERGY</span></> : hud.fireMode === 'Melee' ? <strong style={{ fontSize: '24px' }}>Melee</strong> : <><strong>{hud.ammo}</strong><span>/ {hud.reserveAmmo}</span></>}
             </div>
-            <div className={`reload-status ${hud.reloading ? 'visible' : ''}`}>
+            {hud.weaponId === 'laserCannon' && <div className="laser-energy"><div role="progressbar" aria-label="Laser energy" aria-valuemin={0} aria-valuemax={100} aria-valuenow={hud.ammo}><i style={{width: `${hud.ammo}%`}} /></div><small>{hud.reloading ? 'Recharging' : hud.ammo < 3 ? 'Low energy · Release fire to recharge' : 'Release fire · Recharge after 1.5s'}</small></div>}
+            <div className={`reload-status ${hud.reloading && hud.weaponId !== 'laserCannon' ? 'visible' : ''}`}>
               Reloading
             </div>
           </div>
@@ -377,7 +379,7 @@ export function GameShell() {
           <div className="lobby-orbs">◈ {orbs} <span>ORBS</span></div>
           <div className={`laser-quest ${hud.laserUnlocked ? 'complete' : ''}`} aria-live="polite">
             <span>SECRET PROJECT / LASER CANNON</span>
-            <strong>{hud.laserUnlocked ? 'Unlocked · Weapon coming later' : `${hud.laserPartsCount} / 5 parts recovered`}</strong>
+            <strong>{hud.laserUnlocked ? 'Helion unlocked · Equip in Armory' : `${hud.laserPartsCount} / 5 parts recovered`}</strong>
             {hud.laserNotice && <small key={hud.laserNotice}>{hud.laserNotice}</small>}
             {!hud.laserProgressSaved && <small>Progress is session-only: browser saving is unavailable.</small>}
           </div>
@@ -421,6 +423,7 @@ export function GameShell() {
             </fieldset>
             <div className="controls-row" aria-label="Controls">
               <span className="control-chip"><kbd>Lobby: E</kbd> Open a nearby Armory or Duel deck terminal</span>
+              <span className="control-chip"><kbd>Helion: Hold click</kbd> Beam drains energy · Release to recharge · Requires 5 parts</span>
               <span className="control-chip">
                 <kbd>WASD</kbd> Move
               </span>
@@ -491,7 +494,7 @@ export function GameShell() {
           ? `${orbReward.total > orbReward.matchBonus ? `Round wins +${orbReward.total - orbReward.matchBonus} · ` : ''}Match bonus +${orbReward.matchBonus}`
           : `Round win reward +${orbReward.total}`}</small>
       </div>}
-      <WeaponShop difficulty={difficulty} rocketOwned={rocketOwned} onBuyRocket={buyRocket} meleeWeapon={meleeWeapon} onEquipMelee={equipMelee} open={shopOpen} onOpenChange={setShopOpen} orbs={orbs} orbsSaved={orbsSaved} sniperOwned={sniperOwned} onBuySniper={buySniper} primaryWeapon={primaryWeapon} onEquipPrimary={equipPrimary} orbiterOwned={orbiterOwned} orbClicks={orbClicks} onOrbClick={clickOrb} />
+      <WeaponShop laserOwned={hud.laserUnlocked} laserPartsCount={hud.laserPartsCount} difficulty={difficulty} rocketOwned={rocketOwned} onBuyRocket={buyRocket} meleeWeapon={meleeWeapon} onEquipMelee={equipMelee} open={shopOpen} onOpenChange={setShopOpen} orbs={orbs} orbsSaved={orbsSaved} sniperOwned={sniperOwned} onBuySniper={buySniper} primaryWeapon={primaryWeapon} onEquipPrimary={equipPrimary} orbiterOwned={orbiterOwned} orbClicks={orbClicks} onOrbClick={clickOrb} />
       {started && <div className="pause-hint">ESC releases your mouse · Weapon shop in pause menu</div>}
     </main>
   );

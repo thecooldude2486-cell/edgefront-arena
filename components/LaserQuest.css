@@ -1,4 +1,7 @@
 /* Self-contained styling for the optional lobby scavenger hunt. */
+.laser-energy > div { height: 9px; overflow: hidden; border-radius: 8px; background: #263e49; margin: 8px 0; }
+.laser-energy i { display: block; height: 100%; background: linear-gradient(90deg, #35d5ea, #92f3b5); transition: width .08s linear; }
+.laser-energy small { display: block; color: #92f3b5; font-size: 11px; }
 .laser-quest { position: absolute; left: 24px; top: 185px; max-width: 290px; padding: 10px 14px; border-left: 2px solid #92f3b5; background: #102432d9; }
 .laser-quest > span { display: block; font-size: 9px; letter-spacing: .12em; color: #92f3b5; }
 .laser-quest strong { display: block; margin-top: 5px; font-size: 12px; }

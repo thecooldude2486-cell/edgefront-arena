@@ -20,7 +20,19 @@ Open `http://localhost:3000` in a normal desktop web browser. Press `Control + C
 
 Five hidden components can be collected with **E** in the lobby. Collection
 progress saves in this browser, separately from Orbs. Collecting all five marks
-the laser cannon unlocked; there is no usable cannon or new weapon slot yet.
+the Helion Laser Cannon unlocked. Choose it in the Armory as your primary,
+then press **1** in the arena. Existing five-part saves unlock it automatically.
+Hold left click for a continuous beam; tapping also consumes energy. Release
+fire for 1.5 seconds to begin recharging at 12% per second. The 100% energy bar
+drains at 30% per second; R does not manually reload it. Switching preserves
+energy (it may recharge while holstered), and respawning restores full energy.
+Damage is 6 body / 8 head per 0.1-second tick (60 / 80 DPS), with a 90m range.
+The laser can also melt the eight arena cover panels (60 durability, about one
+second of beam contact). They heat up visibly before breaking and restore each
+round. Lobby walls, boundary walls, floors, ramps and platforms are protected.
+Other weapons do not damage cover. Tune durability in `game/createDestructibleCover.ts`.
+Damage/fire rate are in `game/weaponDefinitions.ts`; energy settings are in
+`game/createLaserEnergy.ts`; the model is in `game/createLaserModel.ts`.
 The localhost and live websites have separate browser saves.
 
 Spoilers (directions assume you face the Duel deck from spawn):
@@ -70,7 +82,7 @@ Win a round to earn 10 Orbs. Winning the first-to-five match adds 25 bonus Orbs 
 
 **Orbiter** is an original grey, white and black orbital-blade melee with a glowing purple centre ring and dot. Click the shop's Orb badge **20 times** to unlock it with a glitch-to-clear reveal. Progress and ownership save in this browser; no Orbs are spent. Press **3** to equip, then click once per swing. It deals **35 damage**, reaches **3 metres**, has a **0.65-second** swing delay, and uses no ammo, reload or scope. Its stats live in `game/weaponDefinitions.ts`, model in `game/createOrbiterModel.ts`, and click requirement in `game/createOrbWallet.ts`. Your primary and Vesper remain equipped alongside it; only slot 4 is empty.
 
-The **Meridian Sniper** costs **500 Orbs** (existing owners keep their unlock at no extra cost) and has Common (green) rarity. Buy it in the weapon shop to see the blurred-to-clear green reveal. Choose **Equip primary** on either the Kestrel or Meridian: you carry only one primary plus the Vesper secondary and unlocked Orbiter melee. Press `1` for your chosen primary and `2` for the pistol. Your choice stays through respawns and Play Again; refreshing defaults to Kestrel without removing sniper ownership. Choosing a different primary does not refill ammo. Use `Q` or right click to scope the sniper. It starts each life with **5 / 15** ammo, deals **34 body / 100 head** damage, fires once per click (at least **1.2 seconds** between shots), and reloads in **2.4 seconds**. AR and pistol stats are unchanged.
+The **Meridian Sniper** costs **750 Orbs** (existing owners keep their unlock at no extra cost) and has Common (green) rarity. Buy it in the weapon shop to see the blurred-to-clear green reveal. Choose **Equip primary** on either the Kestrel or Meridian: you carry only one primary plus the Vesper secondary and unlocked Orbiter melee. Press `1` for your chosen primary and `2` for the pistol. Your choice stays through respawns and Play Again; refreshing defaults to Kestrel without removing sniper ownership. Choosing a different primary does not refill ammo. Use `Q` or right click to scope the sniper. It starts each life with **5 / 15** ammo, deals **34 body / 100 head** damage, fires once per click (at least **1.2 seconds** between shots), and reloads in **2.4 seconds**. AR and pistol stats are unchanged.
 
 The price and browser-local purchase save are in `game/createOrbWallet.ts`. All gun stats are in `game/weaponDefinitions.ts`; the original sniper model is in `game/createSniperModel.ts`. A purchase saves ownership and subtracts Orbs together; failed saving does not charge Orbs. Existing local Orb balances are carried over. Clearing browser site data removes both Orbs and unlocks. They do not sync to another device or to the online address.
 
