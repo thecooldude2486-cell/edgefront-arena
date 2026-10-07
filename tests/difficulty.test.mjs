@@ -18,7 +18,7 @@ try {
     const camera = new UniversalCamera('test', new Vector3(0, 1.7, 0), scene);
     let hits = 0, visible = true;
     const bot = createBot(scene, camera, { onEliminated() {}, onHealthChange() {}, isPlayerAlive: () => visible,
-      onPlayerHit(weapon, zone) { assert.equal(weapon, 'assaultRifle'); assert.equal(zone, 'head'); hits++; },
+      onPlayerHit(weapon, zone) { assert.equal(weapon, 'assaultRifle'); assert.equal(zone, id==='nightmare' ? 'body' : 'head'); hits++; },
     }, () => id);
     bot.update(0, 10000);
     bot.update(0, 10000 + settings.reactionMs - 1); assert.equal(hits, 0);

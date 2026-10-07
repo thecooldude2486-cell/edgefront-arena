@@ -24,6 +24,7 @@ export function createLaserEnergy() {
       }
     },
     reload() { return false; }, // R cannot instantly refill energy.
+    restore(value:number){if(!Number.isFinite(value)||value<0||value>LASER_ENERGY.capacity)return false;energy=value;idle=0;charging=false;return true;},
     reset() { energy = LASER_ENERGY.capacity; idle = 0; charging = false; },
   };
 }

@@ -1,6 +1,10 @@
 import type { WeaponId } from './weaponDefinitions';
 
 export type GameHudState = {
+  teamIntermission?: boolean;
+  teamAlive?: boolean[];
+  teamSize?: number;
+  deathRecap: import('./deathRecap').DeathRecap | null;
   nearbyLaserPart: string | null;
   laserPartsCount: number;
   laserUnlocked: boolean;
@@ -29,6 +33,9 @@ export type GameHudState = {
   botScore: number;
   result: 'none' | 'victory' | 'defeat';
   paused: boolean;
+  awaitingFirstInput: boolean;
 };
 
-export type GameHudUpdate = Partial<GameHudState>;
+export type GameHudUpdate = Partial<GameHudState> & {
+  elimination?: import('./combatXp').EliminationPerformance;
+};

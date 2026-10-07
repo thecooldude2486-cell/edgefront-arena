@@ -3,7 +3,7 @@
 .grapple-hint.clinging { border-color: #c080ff; color: white; }
 .control-chip.grapple-control { grid-column: 1 / -1; flex-wrap: wrap; font-size: 14px; line-height: 1.5; }
 .grapple-control kbd { flex-shrink: 0; }
-.orbiter-progress { text-align: center; color: #ceabff; font-size: 14px; margin: 0; }
+.orbiter-progress { display: block; text-align: center; color: #ceabff; font-size: 14px; margin: 0; }
 [data-slot='dialog-content'].orbiter-unlocking { border-color: #b45cff; box-shadow: 0 0 60px #a450ff30; }
 .sniper-unlock.orbiter-reveal { border-color: #b45cff88; background: radial-gradient(ellipse at center, #51386c88, #10111b 75%); }
 .orbiter-reveal .common-badge, .orbiter-reveal .shop-preview-caption { color: #ceabff; }
@@ -26,26 +26,26 @@
   .preview-glitched canvas { animation: none; filter: grayscale(1); }
   .preview-deglitch canvas { animation: none; }
 }
-.shop-loadout { margin: 0; padding: 12px 16px; border: 1px solid var(--line); border-radius: 8px; font-size: 14px; line-height: 1.7; color: var(--muted); }
+.shop-loadout { display: block; margin: 0; padding: 12px 16px; border: 1px solid var(--line); border-radius: 8px; font-size: 14px; line-height: 1.7; color: var(--muted); }
 .shop-loadout strong { color: var(--ink); }
 .weapon-shop .shop-equip { padding: 14px 18px; font-size: 16px; letter-spacing: .025em; }
 .weapon-shop .shop-equip:disabled { opacity: .6; cursor: default; }
 
-/* Common unlock: the actual 3D weapon resolves from a soft green blur. */
+/* Epic sniper unlock: the actual 3D weapon resolves from a soft blur. */
 .common-badge { display: inline-block; color: #88ed8b; font-weight: 850; font-size: 14px; letter-spacing: .2em; text-transform: uppercase; }
-.shop-item.common-item.selected { border-color: #88ed8b; box-shadow: inset 3px 0 #88ed8b, 0 0 22px #88ed8b16; }
-.shop-item.common-item > span, .shop-item.common-item kbd { color: #88ed8b; }
+.shop-item.epic-item.selected { border-color: #c5a0f4; box-shadow: inset 3px 0 #c5a0f4, 0 0 22px #c5a0f416; }
+.shop-item.epic-item > span, .shop-item.epic-item kbd { color: #c5a0f4; }
 .preview-blurred canvas { filter: blur(7px) brightness(.65); }
 .shop-purchase { display: grid; gap: 12px; }
 .shop-purchase p { color: var(--muted); font-size: 14px; line-height: 1.5; margin: 0; }
 .weapon-shop .primary-button.common-buy { background: #88ed8b; color: #08231b; padding: 14px 18px; font-size: 16px; letter-spacing: .025em; }
 .weapon-shop .common-buy:disabled { opacity: .5; cursor: not-allowed; }
-[data-slot='dialog-content'].weapon-shop-unlocking { border-color: #88ed8b; box-shadow: 0 0 70px #88ed8b25, 0 30px 100px #000c; }
-.sniper-unlock { text-align: center; padding: 24px clamp(12px, 3vw, 40px); border: 1px solid #88ed8b60; border-radius: 12px; background: radial-gradient(ellipse at center, #25634680, #071a1b 75%); }
+[data-slot='dialog-content'].weapon-shop-unlocking { border-color: #c5a0f4; box-shadow: 0 0 70px #c5a0f425, 0 30px 100px #000c; }
+.sniper-unlock { text-align: center; padding: 24px clamp(12px, 3vw, 40px); border: 1px solid #c5a0f460; border-radius: 12px; background: radial-gradient(ellipse at center, #50326780, #091923 75%); }
 .sniper-unlock h2 { font-size: clamp(28px, 4vw, 48px); line-height: 1.15; font-weight: 850; margin: 12px 0; }
 .sniper-unlock > p { margin: 12px 0; }
 .sniper-unlock .shop-preview { height: clamp(210px, 35vh, 360px); }
-.sniper-unlock .shop-preview-caption { color: #88ed8b; }
+.sniper-unlock .shop-preview-caption { color: #c5a0f4; }
 .preview-unlock canvas { animation: sniper-unblur 1600ms cubic-bezier(.2,.7,.2,1) both; }
 @keyframes sniper-unblur {
   0% { filter: blur(22px) brightness(1.7); opacity: .3; transform: scale(.90); }
@@ -1137,3 +1137,9 @@ input {
 .difficulty-options label:hover span { background: #21404e; }
 .difficulty-picker p { color: #dcebf0; font-size: 16px; line-height: 1.5; margin: 12px 0 6px; }
 .difficulty-picker small { display: block; font-size: 14px; color: #92acb9; }
+
+.epic-badge { display: inline-block; color: #c5a0f4; font-weight: 850; font-size: 14px; letter-spacing: .2em; text-transform: uppercase; }
+.weapon-shop .primary-button.epic-buy { background: #c5a0f4; color: #251236; padding: 14px 18px; font-size: 16px; letter-spacing: .025em; }
+.weapon-shop .epic-buy:disabled { opacity: .5; cursor: not-allowed; }
+
+.sniper-unlock > output { display: block; margin: 16px 0; }

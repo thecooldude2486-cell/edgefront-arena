@@ -1,0 +1,549 @@
+.online-screen {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  overflow: auto;
+  padding: 24px;
+  background: rgba(4, 17, 26, 0.97);
+  color: #dcebf0;
+}
+.online-card {
+  width: min(100%, 640px);
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 28px;
+  border: 1px solid #35d5ea66;
+  border-radius: 20px;
+  background: #0b202d;
+}
+.online-card h1 {
+  font-size: clamp(32px, 6vw, 54px);
+  margin: 12px 0;
+}
+.online-card p {
+  line-height: 1.5;
+}
+.online-card label {
+  display: block;
+  margin-top: 22px;
+}
+.online-card input {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 8px 0 16px;
+  padding: 14px;
+  border: 1px solid #35d5ea;
+  background: #071926;
+  color: white;
+  font: 700 24px monospace;
+  letter-spacing: 0.15em;
+  border-radius: 8px;
+}
+.online-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.online-card .primary-button {
+  font-size: 16px;
+  padding: 14px 20px;
+}
+.online-card button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.online-room strong {
+  display: block;
+  font: 700 32px monospace;
+  letter-spacing: 0.15em;
+  color: #35d5ea;
+}
+.online-room h2 {
+  color: #b9f465;
+}
+.online-error {
+  color: #ff9c94;
+}
+.room-visibility {
+  border: 0;
+  padding: 0;
+  margin: 20px 0 14px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.room-visibility legend {
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+.online-card .room-visibility label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  margin: 0;
+  border: 1px solid #35d5ea44;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.room-visibility label:has(input:checked) {
+  background: #123747;
+  border-color: #35d5ea;
+}
+.online-card .room-visibility input {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  margin: 0;
+  accent-color: #35d5ea;
+  flex-shrink: 0;
+}
+.room-visibility small,
+.public-room-browser small {
+  display: block;
+  font-size: 12px;
+  color: #93b1bf;
+  margin-top: 4px;
+}
+.public-room-browser {
+  border-top: 1px solid #35d5ea44;
+  padding-top: 18px;
+  margin-bottom: 24px;
+}
+.public-room-browser h2 {
+  font-size: 20px;
+  margin: 0;
+}
+.public-room-browser h2 span {
+  color: #35d5ea;
+  font-size: 14px;
+}
+.public-room-browser .room-list-note {
+  font-size: 12px;
+  color: #93b1bf;
+}
+.public-room-browser ul {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.public-room-browser li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  background: #071926;
+  border: 1px solid #35d5ea33;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 8px;
+}
+.public-room-browser li .primary-button {
+  padding: 10px 14px;
+  font-size: 13px;
+}
+@media (max-width: 480px) {
+  .room-visibility {
+    grid-template-columns: 1fr;
+  }
+}
+/* Edge-anchored panels leave the centre free at every viewport size. */
+.game-shell:has(.online-movement-hud) > .brand-mark {
+  display: none;
+}
+.online-movement-hud {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  color: #dcebf0;
+  pointer-events: none;
+  font: 12px/1.3 monospace;
+}
+.online-movement-hud p {
+  margin: 4px 0;
+}
+.online-hit-marker {
+  pointer-events: none;
+}
+.online-movement-hud .online-hit-marker.body i {
+  background: #fff;
+}
+.online-movement-hud .online-hit-marker.head i {
+  background: #ff3b45;
+}
+.online-movement-hud .online-hit-marker.direct i {
+  background: #ff3b45;
+}
+.online-movement-hud button {
+  pointer-events: auto;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  border: 1px solid #4c7180;
+  border-radius: 8px;
+  background: #071926e8;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+.online-movement-hud button:hover {
+  background: #163747;
+  border-color: #35d5ea;
+}
+.online-movement-hud button:focus-visible {
+  outline: 2px solid #dcebf0;
+  outline-offset: 3px;
+}
+.online-room-tag {
+  position: absolute;
+  left: 18px;
+  top: 18px;
+  font-size: 10px;
+  color: #93b1bf;
+}
+.online-room-tag strong {
+  color: #35d5ea;
+  letter-spacing: 0.07em;
+}
+.online-health-strip {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  width: min(360px, 44vw);
+  padding: 10px 14px;
+  border: 1px solid #35d5ea40;
+  border-radius: 10px;
+  background: #071926dc;
+}
+.online-health-strip label {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 11px;
+}
+.online-health-strip strong {
+  white-space: nowrap;
+}
+.online-health-strip small {
+  font-size: 9px;
+  font-weight: normal;
+}
+.online-health-strip progress {
+  display: block;
+  width: 100%;
+  height: 5px;
+  margin: 6px 0;
+  border: 0;
+  border-radius: 4px;
+  overflow: hidden;
+  appearance: none;
+  background: #263d49;
+}
+.online-health-strip progress::-webkit-progress-bar {
+  background: #263d49;
+}
+.online-health-strip progress::-webkit-progress-value {
+  background: #35d5ea;
+}
+.online-health-strip progress::-moz-progress-bar {
+  background: #35d5ea;
+}
+.online-opponent progress::-webkit-progress-value {
+  background: #ff8b79;
+}
+.online-opponent progress::-moz-progress-bar {
+  background: #ff8b79;
+}
+.online-health-strip span {
+  display: block;
+  color: #93b1bf;
+  font-size: 9px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.online-health-strip .online-player-name {
+  color: #dcebf0;
+  font-size: 11px;
+  min-width: 0;
+}
+.online-movement-hud .online-health-strip {
+  top: 78px;
+}
+.online-score {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 16px;
+  width: min(400px, calc(100% - 28px));
+  box-sizing: border-box;
+  border: 1px solid #35d5ea66;
+  border-radius: 10px;
+  background: #071926ed;
+}
+.online-score span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 11px;
+}
+.online-score strong {
+  color: #42e5ff;
+  font: bold 26px/1 monospace;
+}
+.online-score small {
+  color: #9ab8c6;
+  font-size: 9px;
+  white-space: nowrap;
+}
+.online-round-result {
+  position: absolute;
+  top: 36%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(440px, 85%);
+  text-align: center;
+  padding: 24px;
+  border: 1px solid #42e5ff88;
+  border-radius: 14px;
+  background: #071926ed;
+}
+.online-round-result strong {
+  font: bold 30px monospace;
+  color: #42e5ff;
+}
+.online-round-result p {
+  color: #b1c8d4;
+  line-height: 1.6;
+}
+@media (max-width: 800px) {
+  .online-room-tag {
+    display: none;
+  }
+  .online-movement-hud .online-actions {
+    top: auto;
+    bottom: 112px;
+    left: 14px;
+    right: auto;
+  }
+}
+.online-actions {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: flex;
+  gap: 6px;
+}
+.online-actions button {
+  padding: 8px 10px;
+  font-size: 11px;
+}
+.online-actions .online-resume {
+  border-color: #35d5ea;
+  color: #35d5ea;
+}
+.online-weapon-dock {
+  position: absolute;
+  bottom: 34px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(620px, calc(100% - 28px));
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+.online-weapon-dock button {
+  min-width: 0;
+  height: 62px;
+  padding: 8px 10px;
+  text-align: left;
+}
+.online-weapon-dock button[aria-pressed='true'] {
+  border-color: #35d5ea;
+  background: #123747ed;
+  box-shadow: inset 0 -3px #35d5ea;
+}
+.online-weapon-dock kbd {
+  display: block;
+  font: bold 13px monospace;
+  color: #35d5ea;
+  margin-bottom: 4px;
+}
+.online-weapon-dock span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}
+.online-ammo {
+  position: absolute;
+  bottom: 112px;
+  right: 18px;
+  text-align: right;
+  text-shadow: 0 2px 5px #000;
+}
+.online-ammo > span {
+  display: block;
+  font-size: 10px;
+  color: #a8c6d4;
+}
+.online-ammo > strong {
+  display: block;
+  font-size: 28px;
+}
+.online-ammo small {
+  font-size: 15px;
+  color: #a8c6d4;
+}
+.online-control-hint {
+  position: absolute;
+  bottom: 10px;
+  width: 100%;
+  text-align: center;
+  color: #93b1bf;
+  font-size: 10px;
+}
+@media (max-width: 760px) {
+  .online-room-tag {
+    display: none;
+  }
+  .online-health-strip {
+    left: 14px;
+    transform: none;
+    top: 58px;
+    width: min(330px, calc(100% - 28px));
+    box-sizing: border-box;
+  }
+  .online-weapon-dock button {
+    padding: 7px;
+  }
+}
+@media (max-height: 480px) {
+  .online-room-tag,
+  .online-control-hint {
+    display: none;
+  }
+  .online-health-strip {
+    top: 8px;
+    left: 8px;
+    transform: none;
+    width: 280px;
+    padding: 7px 10px;
+  }
+  .online-weapon-dock {
+    bottom: 8px;
+  }
+  .online-weapon-dock button {
+    height: 48px;
+    padding: 5px 8px;
+  }
+  .online-ammo {
+    bottom: 68px;
+  }
+}
+
+.online-network-status {
+  position: static;
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid #35d5ea88;
+  border-radius: 7px;
+  background: #071926;
+  color: #b7f3fd;
+  font: 700 11px monospace;
+  box-sizing: border-box;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.online-actions {
+  align-items: center;
+  flex-wrap: wrap;
+  max-width: calc((100% - 440px) /2 - 20px);
+  justify-content: flex-end;
+}
+@media (max-width: 1100px) {
+  .online-movement-hud .online-actions {
+    top: auto;
+    bottom: 112px;
+    left: 14px;
+    right: auto;
+    max-width: calc(100% - 170px);
+    justify-content: flex-start;
+  }
+}
+.online-reconnect {
+  position: absolute;
+  z-index: 80;
+  top: 40%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(420px, 85%);
+  text-align: center;
+  background: #081c2af5;
+  border: 1px solid #edb16a;
+  border-radius: 10px;
+  padding: 22px;
+}
+.online-reconnect strong {
+  font-size: 20px;
+  color: #edb16a;
+}
+.online-reconnect p {
+  line-height: 1.6;
+}
+.online-reconnect button,
+.online-round-result button {
+  padding: 12px 18px;
+  margin-top: 12px;
+}
+.online-round-result button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.online-reconnect {
+  color: #dcebf0;
+  pointer-events: auto;
+  font-family: monospace;
+}
+
+@media (max-width: 450px) {
+  .game-shell .career-dock.online-career {
+    width: 140px;
+    right: 12px;
+  }
+  .online-movement-hud .online-actions {
+    max-width: calc(100% - 170px);
+  }
+  .online-network-status {
+    font-size: 10px;
+    padding: 6px 8px;
+  }
+}
+
+@media (max-height: 500px) {
+  .online-movement-hud .online-actions {
+    bottom: 68px;
+  }
+}

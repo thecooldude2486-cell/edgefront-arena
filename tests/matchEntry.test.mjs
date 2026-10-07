@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {createMatchEntry} from '../game/createMatchEntry.ts';
+let captured=false,requests=0,status=[];
+const gate=createMatchEntry(()=>captured,()=>{requests++;captured=true;return Promise.resolve();},value=>status.push(value));
+gate.prepare();assert.equal(requests,1,'Ready requests capture synchronously within the user gesture');assert.equal(status.length,0,'Ready does not unlock controls during countdown');
+await Promise.resolve();gate.start();assert.equal(requests,1,'Countdown preserves capture instead of requesting it without user activation');assert.deepEqual(status.at(-1),{paused:false,awaitingFirstInput:false});
+captured=false;gate.changed();assert.deepEqual(status.at(-1),{paused:true,awaitingFirstInput:false},'Resume is used after actual play');
+gate.reset();status=[];
+let attempts=0;
+const blocked=createMatchEntry(()=>captured,()=>{attempts++;return Promise.reject(Error('Needs a gesture'));},value=>status.push(value));
+blocked.prepare();await new Promise(resolve=>setTimeout(resolve,0));blocked.start();await new Promise(resolve=>setTimeout(resolve,0));
+assert.ok(status.every(value=>!value.paused && value.awaitingFirstInput),'Rejected initial capture never displays Resume');
+captured=true;blocked.changed();assert.deepEqual(status.at(-1),{paused:false,awaitingFirstInput:false},'First Enter action clears the initial overlay');
+captured=false;blocked.changed();assert.deepEqual(status.at(-1),{paused:true,awaitingFirstInput:false});
+blocked.reset();blocked.start();assert.deepEqual(status.at(-1),{paused:false,awaitingFirstInput:true},'Replay starts with fresh entry state');
+console.log('PASS: Ready gesture capture, countdown handoff, no duplicate capture, rejected initial capture, Enter action, genuine pause and replay.');

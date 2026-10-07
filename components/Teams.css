@@ -1,0 +1,169 @@
+.team-size-picker {
+  border: 1px solid #315366;
+  padding: 14px;
+  margin: 16px 0;
+  color: #b8d6e2;
+}
+.team-size-picker > div {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.team-size-picker button,
+.map-vote button {
+  background: #102d3c;
+  color: #dcebf0;
+  border: 1px solid #4a7182;
+  border-radius: 5px;
+  padding: 10px;
+  cursor: pointer;
+}
+.team-size-picker button[aria-pressed='true'],
+.map-vote button[aria-pressed='true'] {
+  border-color: #35d5ea;
+  background: #174351;
+}
+.team-lobby-roster {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin: 16px 0;
+}
+.team-lobby-roster span {
+  display: block;
+  padding: 5px;
+  color: #aac5d1;
+}
+.map-vote {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.map-vote button {
+  text-align: left;
+  display: grid;
+  gap: 8px;
+}
+.map-vote small {
+  font-size: 11px;
+  color: #9bb9c6;
+}
+.team-match-roster {
+  position: absolute;
+  left: 16px;
+  top: 90px;
+  max-width: 220px;
+  padding: 10px;
+  background: #071926d9;
+  border: 1px solid #315366;
+  display: grid;
+  gap: 4px;
+  font: 10px monospace;
+  pointer-events: auto;
+}
+.team-match-roster .ally {
+  color: #8be6ed;
+}
+.team-match-roster .enemy {
+  color: #ffa6ab;
+}
+.team-local-health {
+  position: absolute;
+  bottom: 112px;
+  right: 24px;
+  padding: 16px;
+  background: #071926ed;
+  border: 1px solid #315366;
+  font: 13px monospace;
+  max-width: min(360px, 40vw);
+  text-align: right;
+}
+.team-match-hud .online-round-result {
+  top: 21%;
+  max-height: 65dvh;
+}
+.bot-team-status {
+  position: absolute;
+  left: 18px;
+  top: 115px;
+  font: 12px monospace;
+  background: #071926dd;
+  padding: 8px;
+}
+@media (max-width: 600px) {
+  .team-match-roster {
+    top: 132px;
+    font-size: 9px;
+    max-width: 150px;
+  }
+  .map-vote {
+    grid-template-columns: 1fr;
+  }
+}
+
+.team-match-hud .online-round-result {
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+.team-match-hud .online-score {
+  max-width: 440px;
+}
+@media (max-width: 600px) {
+  .team-local-health {
+    bottom: 112px;
+    right: 12px;
+    max-width: 43vw;
+    padding: 10px;
+    font-size: 11px;
+  }
+}
+
+.team-room-setup .start-card > button {
+  margin: 8px 8px 8px 0;
+  padding: 10px 14px;
+  border: 1px solid #4a7182;
+  border-radius: 5px;
+  background: #102d3c;
+  color: #dcebf0;
+  cursor: pointer;
+}
+.team-room-setup .start-card > button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.team-room-setup .start-card > label {
+  display: block;
+  margin: 14px 0 6px;
+  color: #aac5d1;
+  font: 12px monospace;
+}
+.team-room-setup input,
+.team-room-setup select {
+  margin-left: 12px;
+  padding: 9px 12px;
+  max-width: 100%;
+  border: 1px solid #4a7182;
+  border-radius: 4px;
+  background: #071926;
+  color: #dcebf0;
+}
+.team-room-setup button:focus-visible,
+.map-vote button:focus-visible {
+  outline: 2px solid #35d5ea;
+  outline-offset: 3px;
+}
+.team-room-setup [role='alert'] {
+  color: #ffa6ab;
+}
+.team-match-roster {
+  max-height: min(260px, 40dvh);
+  overflow-y: auto;
+}
+@media (max-height: 500px) {
+  .team-match-roster {
+    top: 78px;
+    left: auto;
+    right: 14px;
+    max-height: 120px;
+  }
+}

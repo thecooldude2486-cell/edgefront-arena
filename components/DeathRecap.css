@@ -1,0 +1,194 @@
+.death-recap {
+  text-align: left;
+  color: #dcebf0;
+  background: #0a202b;
+  border: 1px solid #e8878c66;
+  border-radius: 10px;
+  padding: 16px;
+  box-sizing: border-box;
+  font: 12px/1.5 monospace;
+  width: 100%;
+}
+.death-recap header small {
+  color: #e8878c;
+  letter-spacing: 0.1em;
+}
+.death-recap h3 {
+  font-size: 16px;
+  margin: 6px 0 12px;
+}
+.recap-numbers {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.recap-numbers span {
+  font-size: 10px;
+  color: #9db8c5;
+}
+.recap-numbers b {
+  display: block;
+  color: #e9f0f1;
+  font-size: 18px;
+}
+.death-recap .recap-final {
+  font-size: 11px;
+  margin: 12px 0;
+}
+.recap-final .rarity-badge {
+  margin-left: 8px;
+}
+.death-recap table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.death-recap th {
+  color: #9db8c5;
+  font-weight: normal;
+}
+.death-recap td,
+.death-recap th {
+  padding: 5px 0;
+  border-bottom: 1px solid #4c718044;
+}
+.death-recap td:not(:first-child),
+.death-recap th:not(:first-child) {
+  text-align: right;
+}
+.death-recap-dialog {
+  z-index: 140;
+  width: min(640px, calc(100% - 32px));
+  max-height: 80dvh;
+  overflow: auto;
+  padding: 18px;
+  border: 1px solid #4c7180;
+  border-radius: 12px;
+  background: #071926;
+  color: #dcebf0;
+}
+.death-recap-dialog::backdrop {
+  background: #03111bcc;
+}
+.death-recap-dialog > button {
+  width: 100%;
+  margin-top: 12px;
+}
+.respawn-overlay .death-recap {
+  margin-top: 12px;
+  width: min(440px, 85vw);
+}
+.online-round-result .death-recap {
+  margin-top: 12px;
+}
+.online-round-result {
+  max-height: 55dvh;
+  overflow: auto;
+  pointer-events: auto;
+}
+.recap-shortcut {
+  position: absolute;
+  top: 90px;
+  right: 18px;
+  z-index: 45;
+  font: 11px monospace;
+  padding: 8px 12px;
+}
+
+.bot-map-label {
+  position: absolute;
+  top: 90px;
+  left: 18px;
+  color: #93b1bf;
+  font: 11px monospace;
+}
+@media (max-width: 650px) {
+  .bot-map-label {
+    top: 130px;
+  }
+  .recap-shortcut {
+    top: 130px;
+  }
+  .online-movement-hud .online-actions {
+    bottom: 112px;
+    max-width: calc(100% - 150px);
+  }
+}
+@media (max-height: 500px) {
+  .online-movement-hud .online-actions {
+    bottom: 68px;
+  }
+  .online-round-result {
+    top: 18%;
+    max-height: 55dvh;
+  }
+  .respawn-overlay .death-recap table {
+    display: none;
+  }
+}
+
+.killcam {
+  margin: 10px 0 14px;
+  background: #061722;
+  border: 1px solid #315366;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.killcam canvas {
+  display: block;
+  width: 100%;
+  height: 180px;
+  touch-action: none;
+}
+.killcam-label,
+.killcam-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 10px;
+  font: 10px monospace;
+}
+.killcam-label span {
+  color: #37d2e5;
+  letter-spacing: 0.06em;
+}
+.killcam-label small {
+  color: #99b4c1;
+}
+.killcam-controls button {
+  font: 11px monospace;
+  padding: 4px 10px;
+  border: 1px solid #315366;
+  border-radius: 4px;
+  background: #102d3c;
+  color: #dcebf0;
+}
+.killcam-controls input {
+  flex: 1;
+  min-width: 0;
+  accent-color: #35d5ea;
+}
+.recap-killer-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin: 12px 0;
+  font-size: 10px;
+  color: #9db8c5;
+}
+.recap-killer-stats b {
+  display: block;
+  color: #dcebf0;
+  font-size: 13px;
+}
+.respawn-overlay {
+  max-height: 85dvh;
+  overflow: auto;
+  pointer-events: auto;
+}
+@media (max-height: 650px) {
+  .killcam canvas {
+    height: 125px;
+  }
+}

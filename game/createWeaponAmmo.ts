@@ -23,6 +23,10 @@ export function createWeaponAmmo(magazineSize: number, startingReserve: number) 
       return true;
     },
 
+    restore(nextMagazine:number,nextReserve:number) {
+      if(!Number.isInteger(nextMagazine)||nextMagazine<0||nextMagazine>magazineSize || !Number.isInteger(nextReserve)||nextReserve<0||nextReserve>startingReserve)return false;
+      magazine=nextMagazine;reserve=nextReserve;return true;
+    },
     reset() {
       magazine = magazineSize;
       reserve = startingReserve;

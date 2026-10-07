@@ -14,13 +14,15 @@ import {
   type WeaponId,
 } from './weaponDefinitions';
 import { BOT, COLORS, SPAWNS } from './config';
-import { DIFFICULTIES, type Difficulty } from './difficulty';
+import { DIFFICULTIES, NIGHTMARE_TACTICS, type Difficulty } from './difficulty';
 
 type BotCallbacks = {
   onEliminated: () => void;
   onHealthChange: (health: number) => void;
   onPlayerHit: (weaponId: WeaponId, hitZone: WeaponHitZone) => void;
   isPlayerAlive: () => boolean;
+  onEnvironmentHit?: (mesh: AbstractMesh, weapon: WeaponId) => void;
+  onShot?: (origin: Vector3, direction: Vector3) => void;
 };
 
 function makeMaterial(scene: Scene, name: string, hex: string, emissive = 0) {
@@ -47,6 +49,7 @@ export function createBot(
   root.rotation.y = SPAWNS.botYaw;
   root.isPickable = false;
   root.checkCollisions = true;
+  root.metadata = { owner: 'bot' };
   root.ellipsoid = new Vector3(0.46, 1.05, 0.46);
 
   const suit = makeMaterial(scene, 'bot coral suit', COLORS.coral);
@@ -146,21 +149,30 @@ export function createBot(
   botGun.material = armour;
   botGun.isPickable = false;
 
-  const patrolPoints = [
+  let patrolPoints = [
     new Vector3(-13, SPAWNS.bot.y, 10),
     new Vector3(-16, SPAWNS.bot.y, -6),
     new Vector3(14, SPAWNS.bot.y, -10),
     new Vector3(16, SPAWNS.bot.y, 7),
   ];
 
+  let spawn = SPAWNS.bot.clone(),
+    autoRespawn = true;
+  let targetOverride: { position: Vector3; alive: boolean } | null = null;
+  const targetAlive = () => targetOverride?.alive ?? callbacks.isPlayerAlive();
   let health = BOT.maxHealth;
   let alive = true;
   let patrolIndex = 0;
   let nextShotAt = performance.now() + 1000;
+  let lastShotAt = -Infinity;
   let sawPlayer = false;
+  let magazine: number = NIGHTMARE_TACTICS.magazine,
+    burstShots = 0;
+  const aimHistory: { at: number; position: Vector3 }[] = [];
   let attackerPosition: Vector3 | null = null;
   let alertSeconds = 0;
-  const retaliates = () => ['hard', 'extreme', 'nightmare'].includes(getDifficulty());
+  const retaliates = () =>
+    ['hard', 'extreme', 'nightmare'].includes(getDifficulty());
   let respawnTimer: ReturnType<typeof setTimeout> | null = null;
   callbacks.onHealthChange(health);
 
@@ -172,7 +184,7 @@ export function createBot(
     const ray = new Ray(eye, towardPlayer.normalize(), distance);
     const obstruction = scene.pickWithRay(ray, (mesh) => {
       return (
-        mesh.checkCollisions &&
+        mesh.isEnabled() && mesh.checkCollisions &&
         mesh !== root &&
         mesh.metadata?.owner !== 'bot' &&
         mesh.metadata?.owner !== 'player'
@@ -186,8 +198,20 @@ export function createBot(
   function fireAtPlayer(now: number, target: Vector3, distance: number) {
     if (now < nextShotAt) return;
     const difficulty = DIFFICULTIES[getDifficulty()];
+    lastShotAt = now;
     nextShotAt = now + difficulty.shotMs + Math.random() * difficulty.jitterMs;
 
+    const nightmare = getDifficulty() === 'nightmare';
+    let aimTarget = target;
+    const aimsAtHead =
+      !nightmare || Math.random() < NIGHTMARE_TACTICS.headChance;
+    if (nightmare) {
+      const remembered =
+        aimHistory.findLast(
+          (sample) => sample.at <= now - NIGHTMARE_TACTICS.trackingDelayMs,
+        ) ?? aimHistory[0];
+      aimTarget = remembered?.position ?? target;
+    }
     const muzzle = root.position.add(new Vector3(0.33, 0.25, -0.9));
     const spread = Math.min(1.9, 0.45 + distance * 0.045) * difficulty.spread;
     const error = new Vector3(
@@ -195,7 +219,20 @@ export function createBot(
       (Math.random() - 0.5) * spread * 0.7,
       (Math.random() - 0.5) * spread,
     );
-    const end = target.add(error);
+    const vertical = aimsAtHead ? 0 : -0.55;
+    const end = aimTarget.add(error).add(new Vector3(0, vertical, 0));
+    if (nightmare) {
+      magazine--;
+      burstShots++;
+      if (magazine === 0) {
+        nextShotAt = now + NIGHTMARE_TACTICS.reloadMs;
+        magazine = NIGHTMARE_TACTICS.magazine;
+        burstShots = 0;
+      } else if (burstShots === NIGHTMARE_TACTICS.burstShots) {
+        nextShotAt = now + NIGHTMARE_TACTICS.recoveryMs;
+        burstShots = 0;
+      }
+    }
     const tracer = MeshBuilder.CreateLines(
       'bot shot tracer',
       { points: [muzzle, end] },
@@ -206,10 +243,25 @@ export function createBot(
     window.setTimeout(() => tracer.dispose(), 75);
 
     // Small random aim error keeps the bot fair for a first-time player.
-    if (error.length() < 0.66) {
-      const horizontalError = Math.hypot(error.x, error.z);
+    const actualError = end.subtract(target.add(new Vector3(0, vertical, 0)));
+    const rayDelta = end.subtract(muzzle),
+      length = rayDelta.length();
+    const blocked = scene.pickWithRay(
+      new Ray(muzzle, rayDelta.normalize(), length),
+      (mesh) => mesh.checkCollisions && mesh !== root && !mesh.metadata?.owner,
+    );
+    callbacks.onShot?.(muzzle, rayDelta.normalizeToNew());
+    if (blocked?.hit && blocked.pickedMesh)
+      callbacks.onEnvironmentHit?.(blocked.pickedMesh, 'assaultRifle');
+    if (
+      (!blocked?.hit || blocked.distance >= length - 0.1) &&
+      actualError.length() < (nightmare ? 0.44 : 0.66)
+    ) {
+      const horizontalError = Math.hypot(actualError.x, actualError.z);
       const hitZone: WeaponHitZone =
-        Math.abs(error.y) < 0.12 && horizontalError < 0.19 ? 'head' : 'body';
+        aimsAtHead && Math.abs(actualError.y) < 0.12 && horizontalError < 0.19
+          ? 'head'
+          : 'body';
       callbacks.onPlayerHit('assaultRifle', hitZone);
     }
   }
@@ -219,36 +271,92 @@ export function createBot(
     callbacks.onHealthChange(health);
     alive = true;
     patrolIndex = 0;
-    root.position.copyFrom(SPAWNS.bot);
+    root.position.copyFrom(spawn);
     root.rotation.set(0, SPAWNS.botYaw, 0);
     root.setEnabled(true);
     nextShotAt = performance.now() + 900;
     sawPlayer = false;
+    lastShotAt = -Infinity;
+    magazine = NIGHTMARE_TACTICS.magazine;
+    burstShots = 0;
+    aimHistory.length = 0;
     attackerPosition = null;
     alertSeconds = 0;
   }
 
+  function hurt(amount: number) {
+    if (!alive) return false;
+    health = Math.max(0, health - amount);
+    callbacks.onHealthChange(health);
+    if (health === 0) {
+      alive = false;
+      root.setEnabled(false);
+      if (autoRespawn) respawnTimer = setTimeout(respawn, BOT.respawnMs);
+      callbacks.onEliminated();
+      return true;
+    }
+    return false;
+  }
   return {
     root,
+    setTeam(team: number) {
+      suit.diffuseColor = Color3.FromHexString(
+        team === 0 ? COLORS.cyan : COLORS.coral,
+      );
+    },
+    setSpawn(value: Vector3) {
+      spawn = value.clone();
+      root.position.copyFrom(spawn);
+    },
+    setAutoRespawn(value: boolean) {
+      autoRespawn = value;
+    },
+    setTarget(position: Vector3 | null, alive = true) {
+      targetOverride = position ? { position: position.clone(), alive } : null;
+    },
+    takeHazardDamage: hurt,
+    setPatrolRoute(points: readonly (readonly [number, number])[]) {
+      patrolPoints = points.map(([x, z]) => new Vector3(x, SPAWNS.bot.y, z));
+      patrolIndex = 0;
+    },
     update(deltaSeconds: number, now: number) {
       if (!alive) return;
       const difficulty = DIFFICULTIES[getDifficulty()];
       alertSeconds = Math.max(0, alertSeconds - deltaSeconds);
-      const alerted = retaliates() && alertSeconds > 0 && attackerPosition !== null && callbacks.isPlayerAlive();
-      visor.emissiveColor = Color3.FromHexString(difficulty.color).scale(.55);
+      const alerted =
+        retaliates() &&
+        alertSeconds > 0 &&
+        attackerPosition !== null &&
+        targetAlive();
+      visor.emissiveColor = Color3.FromHexString(difficulty.color).scale(0.55);
       visor.diffuseColor = Color3.FromHexString(difficulty.color);
-      const playerPosition = camera.position.clone();
+      const playerPosition = (
+        targetOverride?.position ?? camera.position
+      ).clone();
+      aimHistory.push({ at: now, position: playerPosition.clone() });
+      while (
+        aimHistory.length > 2 &&
+        aimHistory[1].at < now - NIGHTMARE_TACTICS.trackingDelayMs - 50
+      )
+        aimHistory.shift();
       const flatToPlayer = playerPosition.subtract(root.position);
       flatToPlayer.y = 0;
       const distance = flatToPlayer.length();
       const canSeePlayer =
-        callbacks.isPlayerAlive() &&
+        targetAlive() &&
         (distance < 27 || alerted) &&
         hasLineOfSight(playerPosition);
 
       let moveDirection: Vector3;
       // Reacquiring the player after cover always requires a fresh reaction.
-      if (canSeePlayer && !sawPlayer) nextShotAt = now + difficulty.reactionMs;
+      if (canSeePlayer && !sawPlayer) {
+        nextShotAt = Math.max(
+          lastShotAt === -Infinity ? 0 : nextShotAt,
+          now + difficulty.reactionMs,
+        );
+        aimHistory.length = 0;
+        aimHistory.push({ at: now, position: playerPosition.clone() });
+      }
       sawPlayer = canSeePlayer;
       if (canSeePlayer) {
         if (alerted) attackerPosition = playerPosition.clone();
@@ -280,7 +388,9 @@ export function createBot(
       }
 
       if (moveDirection.lengthSquared() > 0.001) {
-        const speed = canSeePlayer ? difficulty.moveSpeed : difficulty.patrolSpeed;
+        const speed = canSeePlayer
+          ? difficulty.moveSpeed
+          : difficulty.patrolSpeed;
         root.moveWithCollisions(
           new Vector3(
             moveDirection.x * speed * deltaSeconds,
@@ -297,23 +407,18 @@ export function createBot(
       }
     },
     ownsMesh(mesh: AbstractMesh) {
-      return mesh.metadata?.owner === 'bot';
+      return mesh === root || mesh.isDescendantOf(root);
     },
     takeDamage(weaponId: WeaponId, hitZone: WeaponHitZone) {
       if (!alive) return false;
-      health = applyWeaponDamage(health, weaponId, hitZone);
-      callbacks.onHealthChange(health);
-      if (health === 0) {
-        alive = false;
-        root.setEnabled(false);
-        respawnTimer = setTimeout(respawn, BOT.respawnMs);
-        callbacks.onEliminated();
-        return true;
-      }
-      if (retaliates() && callbacks.isPlayerAlive()) {
+      const amount = health - applyWeaponDamage(health, weaponId, hitZone);
+      if (hurt(amount)) return true;
+      if (retaliates() && targetAlive()) {
         // A hit reveals the attacker for six seconds. Further hits refresh
         // awareness, but do not reset the firing timer (no stun-locking).
-        attackerPosition = camera.position.clone();
+        attackerPosition = (
+          targetOverride?.position ?? camera.position
+        ).clone();
         alertSeconds = 6;
         const facing = attackerPosition.subtract(root.position);
         root.rotation.y = Math.atan2(-facing.x, -facing.z);

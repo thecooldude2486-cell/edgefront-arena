@@ -32,7 +32,7 @@ assert.equal(createOrbWallet(storage(500)).buySniper(), 'insufficient');
 const save = storage(750);
 const wallet = createOrbWallet(save);
 assert.equal(wallet.buySniper(), 'purchased');
-assert.deepEqual(wallet.state, { orbs: 0, sniperOwned: true, rocketOwned: false, orbClicks: 0, orbiterOwned: false, saved: true });
+assert.deepEqual(wallet.state, { orbs: 0, sniperOwned: true, rocketOwned: false, molotovOwned: false, uziOwned: false, orbClicks: 0, orbiterOwned: false, saved: true, characterOwned: [], cosmeticOwned: [], character: { suit: "standard", visor: "dark", gear: "none" }, dailyClaims: 0, lastClaim: "", dailyOffer: null });
 assert.equal(wallet.buySniper(), 'owned');
 wallet.award(10);
 assert.equal(wallet.state.orbs, 10);
@@ -49,6 +49,7 @@ assert.equal(spare.buySniper(), 'purchased');
 assert.equal(spare.state.orbs, 50);
 
 const sniper = WEAPON_DEFINITIONS.sniper;
+assert.equal(sniper.rarity, 'epic', 'Meridian is Epic in every shared weapon view');
 assert.equal(sniper.bodyDamage, 34);
 assert.equal(sniper.headDamage, 100);
 assert.equal(applyWeaponDamage(100, 'sniper', 'body'), 66);
@@ -61,8 +62,8 @@ ammo.fire(); ammo.fire(); ammo.reload();
 assert.deepEqual(ammo.state, { magazine: 5, reserve: 13 });
 ammo.reset();
 assert.deepEqual(ammo.state, { magazine: 5, reserve: 15 });
-assert.deepEqual(WEAPON_DEFINITIONS.assaultRifle, { name: 'Kestrel AR', magazineSize: 20, reserveAmmo: 100, bodyDamage: 12, headDamage: 15, reloadMs: 1650, fireDelayMs: 125, fireMode: 'Auto', range: 160 });
-assert.deepEqual(WEAPON_DEFINITIONS.pistol, { name: 'Vesper Pistol', magazineSize: 8, reserveAmmo: 32, bodyDamage: 10, headDamage: 14, reloadMs: 1500, fireDelayMs: 400, fireMode: 'Semi', range: 130 });
+assert.deepEqual(WEAPON_DEFINITIONS.assaultRifle, { rarity: 'common', name: 'Kestrel AR', magazineSize: 20, reserveAmmo: 100, bodyDamage: 12, headDamage: 15, reloadMs: 1650, fireDelayMs: 125, fireMode: 'Auto', range: 160 });
+assert.deepEqual(WEAPON_DEFINITIONS.pistol, { rarity: 'common', name: 'Vesper Pistol', magazineSize: 8, reserveAmmo: 32, bodyDamage: 10, headDamage: 14, reloadMs: 1500, fireDelayMs: 400, fireMode: 'Semi', range: 130 });
 
 // Exercise the real weapon input/model system without needing a browser GPU.
 const { NullEngine, Scene, UniversalCamera, Vector3 } = await import('@babylonjs/core');
@@ -85,17 +86,22 @@ const camera = new UniversalCamera('test camera', Vector3.Zero(), scene);
 let owned = false;
 let orbiterOwned = false;
 let primary = 'assaultRifle';
+let utility = 'grenade';
+let molotovOwned = false;
+let molotovThrows = 0;
 let melee = 'orbiter';
 let hud;
 let scope = false;
 let rayCount = 0;
 let meleeHealth = 100;
-let markers = [];
+const markers = [];
 let grenadeThrows = 0;
 let rocketsFired = 0;
 scene.pickWithRay = () => { rayCount++; return null; };
 const weapon = createWeapon(scene, camera, canvas, {
-  canUseWeapon: (id) => id === 'orbiter' ? orbiterOwned : id !== 'sniper' || owned,
+  getUtilityWeapon: () => utility,
+  onThrowMolotov: () => { molotovThrows++; },
+  canUseWeapon: (id) => id === 'molotov' ? molotovOwned : id === 'orbiter' ? orbiterOwned : id !== 'sniper' || owned,
   getPrimaryWeapon: () => primary,
   getMeleeWeapon: () => melee,
   onThrowGrenade: () => { grenadeThrows++; },
@@ -118,7 +124,7 @@ key('Digit3');
 assert.equal(hud.id, 'assaultRifle', 'slot 3 no longer selects the sniper');
 key('Digit1');
 assert.deepEqual(hud, { ammo: 5, reserve: 15, reloading: false, id: 'sniper' });
-const press = new Event('pointerdown'); Object.assign(press, { button: 0 });
+const press = new Event('mousedown'); Object.assign(press, { button: 0 });
 canvas.dispatchEvent(press);
 assert.equal(hud.ammo, 4);
 weapon.update(performance.now() + 2000, false);
@@ -134,7 +140,7 @@ key('KeyR');
 assert.equal(scope, false, 'reload immediately removes the sniper scope overlay');
 assert.ok(sniperModel.position.x > .3, 'reload lowers the solid scope away from the centre immediately');
 key('KeyQ');
-const rightPress = new Event('pointerdown'); Object.assign(rightPress, { button: 2 });
+const rightPress = new Event('mousedown'); Object.assign(rightPress, { button: 2 });
 canvas.dispatchEvent(rightPress);
 for (let frame = 0; frame < 40; frame++) weapon.update(performance.now(), false);
 assert.equal(scope, false, 'aim inputs during reload cannot bring the scope back');
@@ -232,6 +238,15 @@ canvas.dispatchEvent(press); assert.equal(rocketsFired, 1); assert.equal(hud.amm
 weapon.update(performance.now() + 3000, false); assert.equal(rocketsFired, 1, 'launcher is semi automatic');
 key('Digit2'); key('Digit1'); assert.equal(hud.ammo, 0);
 weapon.reset(); assert.equal(hud.ammo, 1); assert.equal(hud.reserve, 5);
+utility = 'molotov'; key('Digit4'); assert.notEqual(hud.id, 'molotov', 'locked utility blocked');
+molotovOwned = true; key('Digit4'); assert.equal(hud.id, 'molotov'); assert.equal(hud.ammo, 1);
+canvas.dispatchEvent(press); assert.equal(molotovThrows, 1); assert.equal(hud.ammo, 0);
+weapon.update(performance.now() + 2000, false); assert.equal(molotovThrows, 1, 'holding never repeats a throw');
+key('Digit2'); key('Digit4'); assert.equal(hud.ammo, 0, 'switching preserves spent utility');
+weapon.selectWeapon('grenade'); assert.equal(hud.id, 'molotov', 'unchosen utility cannot be selected');
+weapon.reset(); key('Digit4'); assert.equal(hud.ammo, 1, 'respawn restocks Molotov');
+assert.equal(scene.getTransformNodeByName('molotov utility root').isEnabled(), true);
+utility = 'grenade'; weapon.update(performance.now(), false); assert.equal(hud.id, 'grenade');
 weapon.dispose(); scene.dispose(); engine.dispose();
 
 const clickSave = storage(450);

@@ -5,16 +5,23 @@ const { NullEngine, Scene, MeshBuilder, Vector3 } = await import('@babylonjs/cor
 const { createRockets, ROCKET } = await import('../game/createRockets.ts');
 assert.equal(ROCKET.speed, 45);
 const { getWeaponDamage, applyWeaponDamage } = await import('../game/weaponDefinitions.ts');
-const { createOrbWallet, WALLET_STORAGE_KEY } = await import('../game/createOrbWallet.ts');
-const data = new Map([[WALLET_STORAGE_KEY, JSON.stringify({orbs: 299, sniperOwned: true, orbClicks: 20})]]);
+const { createOrbWallet, WALLET_STORAGE_KEY, ROCKET_PRICE } = await import('../game/createOrbWallet.ts');
+assert.equal(ROCKET_PRICE, 500);
+const legacyOwner = createOrbWallet({getItem: () => JSON.stringify({orbs: 25, rocketOwned: true}), setItem() { throw Error('Existing owners must not be charged'); }});
+assert.equal(legacyOwner.state.rocketOwned, true);
+assert.equal(legacyOwner.buyRocket(), 'owned');
+assert.equal(legacyOwner.state.orbs, 25);
+const oldPrice = createOrbWallet({getItem: () => JSON.stringify({orbs: 300}), setItem() {}});
+assert.equal(oldPrice.buyRocket(), 'insufficient');
+const data = new Map([[WALLET_STORAGE_KEY, JSON.stringify({orbs: 499, sniperOwned: true, orbClicks: 20})]]);
 const storage = {getItem: k => data.get(k) ?? null, setItem: (k,v) => data.set(k,v)};
 let wallet = createOrbWallet(storage);
 assert.equal(wallet.buyRocket(), 'insufficient'); wallet.award(1);
 assert.equal(wallet.buyRocket(), 'purchased'); assert.equal(wallet.state.orbs, 0);
 assert.equal(wallet.buyRocket(), 'owned'); wallet = createOrbWallet(storage);
 assert.equal(wallet.state.rocketOwned, true); assert.equal(wallet.state.sniperOwned, true); assert.equal(wallet.state.orbiterOwned, true);
-const blocked = createOrbWallet({getItem: () => JSON.stringify({orbs: 300}), setItem() {throw Error('blocked');}});
-assert.equal(blocked.buyRocket(), 'unavailable'); assert.equal(blocked.state.orbs, 300); assert.equal(blocked.state.rocketOwned, false);
+const blocked = createOrbWallet({getItem: () => JSON.stringify({orbs: 500}), setItem() {throw Error('blocked');}});
+assert.equal(blocked.buyRocket(), 'unavailable'); assert.equal(blocked.state.orbs, 500); assert.equal(blocked.state.rocketOwned, false);
 assert.equal(getWeaponDamage('rocketLauncher', 'direct'), 67);
 assert.equal(getWeaponDamage('rocketLauncher', 'splash'), 34);
 assert.equal(applyWeaponDamage(100, 'rocketLauncher', 'direct'), 33);
@@ -31,3 +38,19 @@ rockets.fire(Vector3.Zero(), new Vector3(0,0,1)); rockets.update(.5); assert.equ
 rockets.fire(Vector3.Zero(), new Vector3(0,0,1)); rockets.clear(); rockets.update(1); assert.equal(explosions, 2);
 rockets.dispose(); scene.dispose(); engine.dispose();
 console.log('PASS: price, save, legacy unlocks, direct 67 / splash 34, single damage, faster flight, walls and cleanup.');
+
+// Online visuals collide with the intended opponent, never the shooter's model.
+{
+  const {NullEngine,Scene,MeshBuilder,Vector3}=await import('@babylonjs/core');
+  const {createRockets}=await import('../game/createRockets.ts');
+  const engine=new NullEngine(),scene=new Scene(engine);
+  const self=MeshBuilder.CreateBox('online source',{size:1},scene);self.position.z=1;self.metadata={owner:'player'};self.isPickable=false;
+  const opponent=MeshBuilder.CreateBox('online target',{size:1},scene);opponent.position.z=3;opponent.isPickable=false;
+  self.computeWorldMatrix(true);opponent.computeWorldMatrix(true);
+  let impact;
+  const rockets=createRockets(scene,(_position,direct)=>{impact=direct;});
+  rockets.fire(Vector3.Zero(),Vector3.Forward(),[opponent]);rockets.update(.1);
+  assert.equal(impact,opponent,'Online rocket effect stops at opponent despite display-only pickability');
+  rockets.dispose();scene.dispose();engine.dispose();
+  console.log('PASS: online rocket visuals hit the intended player and ignore their owner.');
+}

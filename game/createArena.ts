@@ -7,7 +7,10 @@ import {
   StandardMaterial,
   Vector3,
 } from '@babylonjs/core';
+import { createArenaEnvironment } from './createArenaEnvironment';
+import { mapScale } from './teams';
 import { COLORS } from './config';
+import { DEFAULT_MAP, type ArenaMapId } from './maps';
 import { createDestructibleCover } from './createDestructibleCover';
 
 function material(scene: Scene, name: string, hex: string, emissive = 0) {
@@ -70,7 +73,9 @@ function decorativeBox(
   return mesh;
 }
 
-export function createArena(scene: Scene) {
+export function createArena(scene: Scene, mapId: ArenaMapId = DEFAULT_MAP) {
+  const previousMeshes = new Set(scene.meshes),
+    previousLights = new Set(scene.lights);
   const dark = material(scene, 'midnight structure', COLORS.navy);
   const floor = material(scene, 'arena floor', COLORS.floor);
   const floorLight = material(scene, 'raised surfaces', COLORS.floorLight);
@@ -94,7 +99,9 @@ export function createArena(scene: Scene) {
   const scoreMeshes: Mesh[] = [];
   const coverMeshes: Mesh[] = [];
   function breakableBox(...args: Parameters<typeof arenaBox>) {
-    const mesh = arenaBox(...args); coverMeshes.push(mesh); return mesh;
+    const mesh = arenaBox(...args);
+    coverMeshes.push(mesh);
+    return mesh;
   }
 
   // A wide foundation makes the arena feel like one intentional structure.
@@ -106,40 +113,47 @@ export function createArena(scene: Scene) {
     floor,
   );
 
-  // The centre ring is a low circular stage, not a grid or voxel field.
-  const centre = MeshBuilder.CreateCylinder(
-    'centre combat ring',
-    { diameter: 15, height: 0.32, tessellation: 32 },
-    scene,
-  );
-  centre.position.y = 0.16;
-  centre.material = floorLight;
-  centre.checkCollisions = true;
-  centre.receiveShadows = true;
+  if (mapId === DEFAULT_MAP) {
+    // The centre ring is a low circular stage, not a grid or voxel field.
+    const centre = MeshBuilder.CreateCylinder(
+      'centre combat ring',
+      { diameter: 15, height: 0.32, tessellation: 32 },
+      scene,
+    );
+    centre.position.y = 0.16;
+    centre.material = floorLight;
+    centre.checkCollisions = true;
+    centre.receiveShadows = true;
 
-  const centreStripe = MeshBuilder.CreateTorus(
-    'centre ring trim',
-    { diameter: 13.2, thickness: 0.17, tessellation: 48 },
-    scene,
-  );
-  centreStripe.position.y = 0.36;
-  centreStripe.material = lime;
-
+    const centreStripe = MeshBuilder.CreateTorus(
+      'centre ring trim',
+      { diameter: 13.2, thickness: 0.17, tessellation: 48 },
+      scene,
+    );
+    centreStripe.position.y = 0.36;
+    centreStripe.material = lime;
+  }
   // Perimeter walls curve visually around the play space using angled segments.
-  arenaBox(
-    scene,
-    'north wall',
-    new Vector3(0, 2.2, 21.5),
-    { width: 48, height: 4.4, depth: 1 },
-    dark,
-  );
-  arenaBox(
-    scene,
-    'south wall',
-    new Vector3(0, 2.2, -21.5),
-    { width: 48, height: 4.4, depth: 1 },
-    dark,
-  );
+  // Open launch docks lead outside the foundation into a real void.
+  for (const side of [-1, 1]) {
+    const gap = side * 14;
+    const left = gap - 2.1,
+      right = gap + 2.1;
+    arenaBox(
+      scene,
+      side === 1 ? 'north wall' : 'south wall',
+      new Vector3((-24 + left) / 2, 2.2, side * 21.5),
+      { width: left + 24, height: 4.4, depth: 1 },
+      dark,
+    );
+    arenaBox(
+      scene,
+      `${side} outer wall right`,
+      new Vector3((right + 24) / 2, 2.2, side * 21.5),
+      { width: 24 - right, height: 4.4, depth: 1 },
+      dark,
+    );
+  }
   arenaBox(
     scene,
     'east wall',
@@ -221,89 +235,234 @@ export function createArena(scene: Scene) {
     );
   }
 
-  // Paired diagonal fins provide purposeful cover around the central ring.
-  const coverPositions = [
-    [-8.5, -6, -0.3],
-    [8.5, -6, 0.3],
-    [-8.5, 6, 0.3],
-    [8.5, 6, -0.3],
-  ] as const;
-  coverPositions.forEach(([x, z, rotation], index) => {
-    breakableBox(
-      scene,
-      `centre cover ${index}`,
-      new Vector3(x, 1.25, z),
-      { width: 5.5, height: 2.5, depth: 0.7 },
-      index < 2 ? cyan : coral,
-      rotation,
-    );
-  });
+  if (mapId === DEFAULT_MAP) {
+    // Paired diagonal fins provide purposeful cover around the central ring.
+    const coverPositions = [
+      [-8.5, -6, -0.3],
+      [8.5, -6, 0.3],
+      [-8.5, 6, 0.3],
+      [8.5, 6, -0.3],
+    ] as const;
+    coverPositions.forEach(([x, z, rotation], index) => {
+      breakableBox(
+        scene,
+        `centre cover ${index}`,
+        new Vector3(x, 1.25, z),
+        { width: 5.5, height: 2.5, depth: 0.7 },
+        index < 2 ? cyan : coral,
+        rotation,
+      );
+    });
 
-  // Elevated side lanes and broad ramps give three routes through the map.
-  for (const side of [-1, 1] as const) {
-    const x = side * 20;
-    arenaBox(
-      scene,
-      `${side} side platform`,
-      new Vector3(x, 2.2, 0),
-      { width: 7, height: 0.6, depth: 14 },
-      floorLight,
-    );
-    // Two rail sections leave a central entrance into the spectator stands.
-    for (const z of [-4.5, 4.5]) {
+    // Elevated side lanes and broad ramps give three routes through the map.
+    for (const side of [-1, 1] as const) {
+      const x = side * 20;
       arenaBox(
         scene,
-        `${side} side rail outer ${z}`,
-        new Vector3(x + side * 3.35, 3.1, z),
-        { width: 0.35, height: 1.5, depth: 5 },
-        lime,
+        `${side} side platform`,
+        new Vector3(x, 2.2, 0),
+        { width: 7, height: 0.6, depth: 14 },
+        floorLight,
+      );
+      // Two rail sections leave a central entrance into the spectator stands.
+      for (const z of [-4.5, 4.5]) {
+        arenaBox(
+          scene,
+          `${side} side rail outer ${z}`,
+          new Vector3(x + side * 3.35, 3.1, z),
+          { width: 0.35, height: 1.5, depth: 5 },
+          lime,
+        );
+      }
+      breakableBox(
+        scene,
+        `${side} side cover`,
+        new Vector3(x, 3.4, 0),
+        { width: 3.8, height: 2.1, depth: 0.65 },
+        dark,
+      );
+      createRamp(
+        scene,
+        `${side} north ramp`,
+        new Vector3(x, 1.05, 9.5),
+        6.5,
+        7,
+        2.2,
+        -1,
+        floorLight,
+      );
+      createRamp(
+        scene,
+        `${side} south ramp`,
+        new Vector3(x, 1.05, -9.5),
+        6.5,
+        7,
+        2.2,
+        1,
+        floorLight,
       );
     }
+
+    // Low centre barriers interrupt long sightlines without closing the arena.
     breakableBox(
       scene,
-      `${side} side cover`,
-      new Vector3(x, 3.4, 0),
-      { width: 3.8, height: 2.1, depth: 0.65 },
-      dark,
+      'centre north barrier',
+      new Vector3(0, 0.8, 7.7),
+      { width: 6, height: 1.6, depth: 0.7 },
+      coral,
     );
-    createRamp(
+    breakableBox(
       scene,
-      `${side} north ramp`,
-      new Vector3(x, 1.05, 9.5),
-      6.5,
-      7,
-      2.2,
-      -1,
-      floorLight,
+      'centre south barrier',
+      new Vector3(0, 0.8, -7.7),
+      { width: 6, height: 1.6, depth: 0.7 },
+      cyan,
     );
-    createRamp(
-      scene,
-      `${side} south ramp`,
-      new Vector3(x, 1.05, -9.5),
-      6.5,
-      7,
-      2.2,
-      1,
-      floorLight,
-    );
+  } else {
+    const box = (
+      name: string,
+      x: number,
+      y: number,
+      z: number,
+      width: number,
+      height: number,
+      depth: number,
+      breakable = false,
+      surface = floorLight,
+    ) => {
+      const mesh = arenaBox(
+        scene,
+        `${mapId} ${name}`,
+        new Vector3(x, y, z),
+        { width, height, depth },
+        surface,
+      );
+      if (breakable) coverMeshes.push(mesh);
+      return mesh;
+    };
+    if (mapId === 'switchyard') {
+      for (const x of [-8, 8])
+        for (const z of [-6, 6]) {
+          box(
+            `shelter ${x} ${z}`,
+            x,
+            1.2,
+            z,
+            7,
+            2.4,
+            0.8,
+            true,
+            x < 0 ? cyan : coral,
+          );
+          box(
+            `route marker ${x} ${z}`,
+            x,
+            0.06,
+            z + Math.sign(z) * 1.2,
+            7,
+            0.12,
+            0.15,
+            false,
+            lime,
+          ).checkCollisions = false;
+        }
+      box('low central island', 0, 0.55, 0, 5, 1.1, 5, true, dark);
+      for (const x of [-19, 19])
+        box(`outer safety wall ${x}`, x, 1.1, 0, 0.8, 2.2, 9, true, dark);
+    } else if (mapId === 'skyline') {
+      box('lower combat deck', 0, 0.95, 0, 9, 1.9, 12);
+      for (const z of [-9.5, 9.5])
+        createRamp(
+          scene,
+          `skyline central ramp ${z}`,
+          new Vector3(0, 0.95, z),
+          8,
+          7,
+          1.9,
+          z < 0 ? -1 : 1,
+          floorLight,
+        );
+      for (const x of [-15, 15]) {
+        box(`high flank ${x}`, x, 4.5, 0, 6, 0.6, 10);
+        for (const z of [-9.5, 9.5])
+          createRamp(
+            scene,
+            `skyline flank ramp ${x} ${z}`,
+            new Vector3(x, 2.2, z),
+            5.5,
+            9,
+            4.8,
+            z < 0 ? -1 : 1,
+            floorLight,
+          );
+        box(
+          `high cover ${x}`,
+          x,
+          5.4,
+          0,
+          2.8,
+          1.2,
+          0.7,
+          true,
+          x < 0 ? cyan : coral,
+        );
+      }
+      box('skybridge', 0, 4.6, 0, 30, 0.4, 3);
+      for (const z of [-1.7, 1.7])
+        box(`bridge edge ${z}`, 0, 4.92, z, 30, 0.22, 0.18, false, lime);
+      for (const x of [-6, 6])
+        box(
+          `lower shelter ${x}`,
+          x,
+          0.85,
+          5 * Math.sign(x),
+          2,
+          1.7,
+          2,
+          true,
+          dark,
+        );
+    } else {
+      for (const x of [-18, 18])
+        for (const z of [-7, 7]) {
+          box(`firing deck ${x} ${z}`, x, 2.2, z, 6, 0.6, 5);
+          createRamp(
+            scene,
+            `crossfire ramp ${x} ${z}`,
+            new Vector3(x, 1, z + Math.sign(z) * 5.5),
+            5.5,
+            6,
+            2.5,
+            z < 0 ? -1 : 1,
+            floorLight,
+          );
+          box(
+            `deck cover ${x} ${z}`,
+            x,
+            2.95,
+            z,
+            2.2,
+            0.9,
+            0.5,
+            true,
+            x < 0 ? cyan : coral,
+          );
+        }
+      for (const x of [-8, 8])
+        for (const z of [-6, 6])
+          box(`cover island ${x} ${z}`, x, 0.45, z, 2, 0.9, 2, true, dark);
+      for (const x of [-12, 12])
+        box(`sightline column ${x}`, x, 2.1, 0, 1.5, 4.2, 1.5, false, lime);
+      const ring = MeshBuilder.CreateTorus(
+        'crossfire centre target',
+        { diameter: 11, thickness: 0.15, tessellation: 40 },
+        scene,
+      );
+      ring.position.y = 0.06;
+      ring.material = coral;
+      ring.isPickable = false;
+    }
   }
-
-  // Low centre barriers interrupt long sightlines without closing the arena.
-  breakableBox(
-    scene,
-    'centre north barrier',
-    new Vector3(0, 0.8, 7.7),
-    { width: 6, height: 1.6, depth: 0.7 },
-    coral,
-  );
-  breakableBox(
-    scene,
-    'centre south barrier',
-    new Vector3(0, 0.8, -7.7),
-    { width: 6, height: 1.6, depth: 0.7 },
-    cyan,
-  );
-
   // Thin floor guides act like court markings and do not block movement.
   for (const x of [-12, 12]) {
     const guide = arenaBox(
@@ -376,20 +535,7 @@ export function createArena(scene: Scene) {
   // decks are solid and walkable; seats stay non-colliding so they never snag
   // the player while exploring the spectator area.
   const seatZPositions = [
-    -15,
-    -13.2,
-    -11.4,
-    -9.6,
-    -7.8,
-    -6,
-    -4.2,
-    4.2,
-    6,
-    7.8,
-    9.6,
-    11.4,
-    13.2,
-    15,
+    -15, -13.2, -11.4, -9.6, -7.8, -6, -4.2, 4.2, 6, 7.8, 9.6, 11.4, 13.2, 15,
   ];
 
   for (const side of [-1, 1] as const) {
@@ -594,9 +740,7 @@ export function createArena(scene: Scene) {
         2,
         scene,
       );
-      spotlight.diffuse = Color3.FromHexString(
-        x < 0 ? '#8feaf6' : '#ffd0c8',
-      );
+      spotlight.diffuse = Color3.FromHexString(x < 0 ? '#8feaf6' : '#ffd0c8');
       spotlight.intensity = 0.36;
       spotlight.range = 58;
     }
@@ -650,22 +794,100 @@ export function createArena(scene: Scene) {
     lime,
   );
 
+  const arenaMaterials = {
+    dark,
+    floor,
+    floorLight,
+    cyan,
+    coral,
+    lime,
+    concrete,
+    seatCyan,
+    seatCoral,
+    flood,
+    glass,
+    scoreMaterial,
+  };
+  if (['foundry', 'relay', 'harbor', 'citadel'].includes(mapId)) {
+    for (const x of [-14, -7, 7, 14])
+      for (const z of [-9, 0, 9]) {
+        const height =
+          mapId === 'citadel' ? 2.8 : mapId === 'relay' ? 2.1 : 1.6;
+        const block = arenaBox(
+          scene,
+          `${mapId} team cover`,
+          new Vector3(x, height / 2, z + (x < 0 ? -2 : 2)),
+          { width: 3.5, height, depth: 1.2 },
+          floorLight,
+        );
+        coverMeshes.push(block);
+      }
+    if (mapId === 'relay' || mapId === 'citadel')
+      for (const x of [-16, 16]) {
+        arenaBox(
+          scene,
+          `${mapId} command deck`,
+          new Vector3(x, 1.8, 0),
+          { width: 5, height: 0.4, depth: 6 },
+          floorLight,
+        );
+        createRamp(
+          scene,
+          `${mapId} command ramp`,
+          new Vector3(x, 0.85, 6),
+          4,
+          6,
+          1.7,
+          1,
+          floorLight,
+        );
+      }
+    if (mapId === 'harbor')
+      for (const x of [-9, 9])
+        for (const z of [-13, 13])
+          arenaBox(
+            scene,
+            'harbor cargo stack',
+            new Vector3(x, 1.8, z),
+            { width: 4, height: 3.6, depth: 3 },
+            concrete,
+          );
+    const scale = mapScale(mapId);
+    scene.meshes
+      .filter((m) => !previousMeshes.has(m) && !m.parent)
+      .forEach((m) => {
+        m.position.x *= scale;
+        m.position.z *= scale;
+        m.scaling.x *= scale;
+        m.scaling.z *= scale;
+      });
+    scene.lights
+      .filter((l) => !previousLights.has(l))
+      .forEach((l) => {
+        if ('position' in l) {
+          const p = (l as SpotLight).position;
+          p.x *= scale;
+          p.z *= scale;
+        }
+      });
+  }
+  const cover = createDestructibleCover(scene, coverMeshes);
+  const environment = createArenaEnvironment(scene, mapId);
+  const meshes = scene.meshes.filter((mesh) => !previousMeshes.has(mesh));
+  const lights = scene.lights.filter((light) => !previousLights.has(light));
   return {
-    cover: createDestructibleCover(scene, coverMeshes),
+    mapId,
+    environment,
+    cover,
     scoreMeshes,
-    materials: {
-      dark,
-      floor,
-      floorLight,
-      cyan,
-      coral,
-      lime,
-      concrete,
-      seatCyan,
-      seatCoral,
-      flood,
-      glass,
-      scoreMaterial,
+    materials: arenaMaterials,
+    meshes,
+    dispose() {
+      environment.dispose();
+      cover.dispose();
+      meshes.forEach((mesh) => mesh.dispose());
+      lights.forEach((light) => light.dispose());
+      Object.values(arenaMaterials).forEach((surface) => surface.dispose());
     },
   };
 }

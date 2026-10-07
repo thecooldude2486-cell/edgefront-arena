@@ -26,7 +26,7 @@ export const PISTOL = WEAPON_DEFINITIONS.pistol;
 
 export const BOT = {
   maxHealth: 100,
-  respawnMs: 2000,
+  respawnMs: 3000,
 };
 
 export const MATCH = {

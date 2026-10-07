@@ -1,0 +1,30 @@
+.rarity-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: max-content;
+  max-width: 100%;
+  padding: 4px 8px;
+  margin: 6px 0;
+  border: 1px solid;
+  border-radius: 5px;
+  font: 700 10px/1.25 monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+.rarity-badge i {
+  width: 5px;
+  height: 5px;
+  background: currentColor;
+  transform: rotate(45deg);
+}
+
+.shop-item > .rarity-badge,
+.loadout-choices button .rarity-badge {
+  display: inline-flex;
+  justify-content: flex-start;
+  gap: 6px;
+  font: 700 10px/1.25 monospace;
+  letter-spacing: 0.06em;
+}

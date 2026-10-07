@@ -23,7 +23,13 @@ jobs:
           node-version: 24
       - name: Install dependencies
         run: npm install
+      - name: Install multiplayer test dependencies
+        run: npm ci --prefix server
+      - name: Test game and multiplayer
+        run: node --test --test-concurrency=2 tests/*.test.mjs server/*.test.mjs
       - name: Build game for GitHub Pages
+        env:
+          VITE_MULTIPLAYER_URL: ${{ vars.VITE_MULTIPLAYER_URL }}
         run: npm run build:pages
       - name: Verify website entry file
         run: |

@@ -47,8 +47,8 @@ const weapon = createWeapon(scene, camera, canvas, {
   onImpact: mesh => { if (mesh === target) { damageTicks++; return 'body'; } return 'none'; },
   onHitMarker() {},
 });
-const press = () => { const e = new Event('pointerdown'); e.button = 0; canvas.dispatchEvent(e); };
-const release = () => { const e = new Event('pointerup'); e.button = 0; window.dispatchEvent(e); };
+const press = () => { const e = new Event('mousedown'); e.button = 0; canvas.dispatchEvent(e); };
+const release = () => { const e = new Event('mouseup'); e.button = 0; window.dispatchEvent(e); };
 function advance(ms) { for (let i = 0; i < ms; i += 50) { now += 50; weapon.update(now, false); } }
 weapon.selectWeapon('laserCannon'); assert.equal(weapon.id, 'assaultRifle', 'Locked until five parts');
 unlocked = true; weapon.selectWeapon('laserCannon');

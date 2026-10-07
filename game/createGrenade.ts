@@ -1,5 +1,8 @@
+import { createWeaponCosmetics } from './createWeaponCosmetics';
+import { EMPTY_COSMETICS, type Cosmetics } from './progression';
 import { Color3, MeshBuilder, Ray, Scene, StandardMaterial, TransformNode, Vector3 } from '@babylonjs/core';
-export const GRENADE = { fuse: 2, radius: 4, speed: 15, gravity: 20 };
+import { GRENADE } from './projectileDefinitions';
+export { GRENADE };
 export function populateGrenadeModel(scene: Scene, root: TransformNode) {
   const shell = new StandardMaterial('grenade graphite', scene);
   shell.diffuseColor = Color3.FromHexString('#182733');
@@ -14,8 +17,8 @@ export function populateGrenadeModel(scene: Scene, root: TransformNode) {
 }
 
 // Physics and fuse use the same active-game time, so flight counts toward detonation.
-export function createGrenades(scene: Scene, explode: (position: Vector3) => void) {
-  const flying: {root: TransformNode; velocity: Vector3; age: number}[] = [];
+export function createGrenades(scene: Scene, explode: (position: Vector3, self: boolean) => void) {
+  const flying: {root: TransformNode; velocity: Vector3; age: number; self: boolean; finish: ReturnType<typeof createWeaponCosmetics>}[] = [];
   const effects: {mesh: ReturnType<typeof MeshBuilder.CreateSphere>; age: number}[] = [];
   const blast = new StandardMaterial('grenade blast glow', scene);
   blast.emissiveColor = Color3.FromHexString('#8befff'); blast.alpha = .18; blast.disableLighting = true;
@@ -25,10 +28,11 @@ export function createGrenades(scene: Scene, explode: (position: Vector3) => voi
     root.dispose(); materials.forEach(material => material?.dispose());
   }
   return {
-    throw(origin: Vector3, direction: Vector3) {
+    throw(origin: Vector3, direction: Vector3, cosmetics: Cosmetics = EMPTY_COSMETICS, self = true) {
       const root = new TransformNode('thrown grenade', scene);
       populateGrenadeModel(scene, root); root.position.copyFrom(origin);
-      flying.push({root, velocity: direction.scale(GRENADE.speed).add(new Vector3(0, 3, 0)), age: 0});
+      const finish=createWeaponCosmetics(root);finish.apply(cosmetics);
+      flying.push({root, finish, self, velocity: direction.scale(GRENADE.speed).add(new Vector3(0, 3, 0)), age: 0});
     },
     canDamage(origin: Vector3, target: Vector3) {
       const delta = target.subtract(origin), distance = delta.length();
@@ -50,13 +54,14 @@ export function createGrenades(scene: Scene, explode: (position: Vector3) => voi
             item.velocity.setAll(0);
           } else item.root.position.addInPlace(motion);
         }
+        item.finish.update(dt);
         item.age += dt;
         if (item.age >= GRENADE.fuse) {
           const position = item.root.position.clone();
-          flying.splice(flying.indexOf(item), 1); disposeRoot(item.root);
+          flying.splice(flying.indexOf(item), 1); item.finish.dispose(); disposeRoot(item.root);
           const mesh = MeshBuilder.CreateSphere('grenade explosion', {diameter: GRENADE.radius * 2, segments: 16}, scene);
           mesh.position.copyFrom(position); mesh.material = blast; mesh.isPickable = false;
-          effects.push({mesh, age: 0}); explode(position);
+          effects.push({mesh, age: 0}); explode(position, item.self);
         }
       }
       for (const effect of [...effects]) {
@@ -64,7 +69,7 @@ export function createGrenades(scene: Scene, explode: (position: Vector3) => voi
         if (effect.age >= .3) { effect.mesh.dispose(); effects.splice(effects.indexOf(effect), 1); }
       }
     },
-    clear() { flying.splice(0).forEach(item => disposeRoot(item.root)); effects.splice(0).forEach(item => item.mesh.dispose()); },
+    clear() { flying.splice(0).forEach(item => { item.finish.dispose(); disposeRoot(item.root); }); effects.splice(0).forEach(item => item.mesh.dispose()); },
     dispose() { this.clear(); blast.dispose(); },
   };
 }

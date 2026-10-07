@@ -1,7 +1,8 @@
 # Publish with GitHub Actions and GitHub Pages
 
 GitHub Actions builds the game. GitHub Pages hosts the resulting website.
-The game runs in each visitor's browser and does not need a running server.
+Bot matches run in each visitor's browser. Online matches also need the separate
+Node room server described in `server/README.md`.
 No Cloudflare account or Cloudflare secrets are needed.
 
 ## One-time setup
@@ -23,6 +24,7 @@ code, so do that only if you want to share it.
 
 ## Build details
 
+- The workflow runs game and multiplayer tests before building.
 - Build command: `npm run build:pages`
 - Folder to publish: `dist-pages`
 - Website entry file: `dist-pages/index.html`
@@ -33,3 +35,14 @@ code, so do that only if you want to share it.
 The regular `npm run dev` preview still works. The Pages entry reuses the
 existing GameShell, styles, and game code. Only the website wrapper and build
 configuration differ from the server preview.
+
+## Online room server
+
+Host `server/` on a service that supports long-running Node 24 processes and secure
+WebSockets. In repository Settings → Secrets and variables → Actions → Variables,
+set `VITE_MULTIPLAYER_URL` to its public `wss://` address. The Pages workflow passes
+that variable to the frontend build. On the room server, allow
+`https://thecooldude2486-cell.github.io` in `ALLOWED_ORIGINS`.
+
+GitHub Pages only hosts the frontend; it cannot run the room server. Without the
+variable, bot matches work and online rooms display a configuration message.
