@@ -1,0 +1,217 @@
+.match-roster {
+  position: absolute;
+  top: 116px;
+  left: 16px;
+  width: 220px;
+  max-height: calc(100dvh - 300px);
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid #315366;
+  border-radius: 7px;
+  background: #071926df;
+  font: 11px monospace;
+  pointer-events: auto;
+}
+.match-roster h3 {
+  display: flex;
+  justify-content: space-between;
+  margin: 2px 0 7px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.match-roster h3 small {
+  font-size: 10px;
+  color: #9db8c5;
+  font-weight: normal;
+}
+.opposing-match-roster {
+  left: auto;
+  right: 16px;
+  border-color: #805058;
+  max-height: calc(100dvh - 440px);
+}
+.split-match-roster {
+  padding: 6px;
+}
+.match-roster.split-match-roster button {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 6px;
+  padding: 2px 3px;
+  margin-bottom: 1px;
+}
+.split-match-roster .roster-status {
+  max-width: 110px;
+  align-self: center;
+  text-align: right;
+}
+.split-match-roster .roster-health {
+  grid-column: 1 / -1;
+}
+.match-roster section + section {
+  margin-top: 12px;
+}
+.cyan-roster {
+  color: #8be6ed;
+}
+.coral-roster {
+  color: #ffa6ab;
+}
+.match-roster button {
+  width: 100%;
+  display: grid;
+  gap: 4px;
+  padding: 7px 5px;
+  margin-bottom: 3px;
+  text-align: left;
+  background: transparent;
+  color: inherit;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font: inherit;
+  cursor: pointer;
+}
+.match-roster button:disabled {
+  cursor: default;
+  opacity: 1;
+}
+.match-roster button[aria-pressed='true'] {
+  border-color: #35d5ea;
+  background: #174351;
+}
+.match-roster button.eliminated {
+  color: #8197a3;
+}
+.roster-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  font-weight: bold;
+}
+.roster-status {
+  color: #aac5d1;
+  font-size: 10px;
+}
+.roster-health {
+  display: block;
+  height: 3px;
+  background: #31536666;
+}
+.roster-health > i {
+  display: block;
+  height: 100%;
+  background: currentColor;
+  transition: width 0.15s;
+}
+.spectator-controls {
+  position: absolute;
+  left: 50%;
+  bottom: 125px;
+  transform: translateX(-50%);
+  display: grid;
+  gap: 7px;
+  min-width: min(340px, 90vw);
+  padding: 15px;
+  border: 1px solid #35d5ea88;
+  border-radius: 7px;
+  background: #071926ed;
+  color: #dcebf0;
+  text-align: center;
+  font: 12px monospace;
+  pointer-events: auto;
+}
+.spectator-controls small {
+  color: #8be6ed;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+.spectator-controls strong {
+  font-size: 18px;
+}
+.spectator-controls span {
+  color: #aac5d1;
+}
+.spectator-controls > div {
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.spectator-controls button,
+.recap-close {
+  background: #102d3c;
+  color: #dcebf0;
+  border: 1px solid #4a7182;
+  border-radius: 4px;
+  padding: 8px 11px;
+  font: 11px monospace;
+  cursor: pointer;
+}
+.spectator-controls button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.spectator-controls button:focus-visible,
+.match-roster button:focus-visible,
+.recap-close:focus-visible {
+  outline: 2px solid #35d5ea;
+  outline-offset: 2px;
+}
+@media (max-width: 700px) {
+  .match-roster {
+    top: 154px;
+    left: 8px;
+    width: 145px;
+    padding: 6px;
+    max-height: calc(100dvh - 360px);
+  }
+  .roster-status {
+    font-size: 9px;
+  }
+  .opposing-match-roster {
+    left: auto;
+    right: 8px;
+    max-height: calc(100dvh - 480px);
+  }
+  .split-match-roster h3 {
+    letter-spacing: 0;
+    font-size: 10px;
+  }
+  .split-match-roster h3 small {
+    font-size: 9px;
+  }
+  .split-match-roster .roster-name {
+    font-size: 10px;
+  }
+  .split-match-roster .roster-status {
+    max-width: 70px;
+  }
+  .spectator-controls {
+    bottom: 150px;
+    padding: 10px;
+  }
+}
+@media (max-height: 550px) {
+  .match-roster {
+    top: 95px;
+    max-height: 150px;
+    width: 170px;
+  }
+  .spectator-controls {
+    bottom: 65px;
+    padding: 9px;
+    gap: 4px;
+  }
+  .split-match-roster {
+    max-height: calc(100dvh - 270px);
+  }
+  .opposing-match-roster {
+    max-height: calc(100dvh - 410px);
+  }
+}
+@media (max-height: 500px) {
+  .opposing-match-roster {
+    max-height: max(60px, calc(100dvh - 325px));
+  }
+}

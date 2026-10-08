@@ -1,7 +1,10 @@
 'use client';
+import { GameHeader } from './GameHeader';
+import './GameLayout.css';
+import { MatchRoster, SpectatorControls } from './MatchRoster';
 import { TeamSizePicker } from './TeamSizePicker';
 import { TeamOnlineRooms } from './TeamOnlineRooms';
-import { chooseVotedMap, mapsForTeams, type TeamSize } from '@/game/teams';
+import { mapsForTeams, type TeamSize } from '@/game/teams';
 import './Teams.css';
 
 import { MapPicker } from './MapPicker';
@@ -189,13 +192,14 @@ export function GameShell() {
   }, [openArmory, openCareer, openCosmetics, openCharacterShop]);
   const [teamSize, setTeamSize] = useState<TeamSize>(1);
   const teamSizeRef = useRef<TeamSize>(1);
-  const [botVotes, setBotVotes] = useState<ArenaMapId[]>(['stadium']);
-  const botVotesRef = useRef<ArenaMapId[]>(['stadium']);
   const [mapId, setMapId] = useState<ArenaMapId>(DEFAULT_MAP);
   const mapRef = useRef<ArenaMapId>(DEFAULT_MAP);
   const [recapOpen, setRecapOpen] = useState(false);
+  const [dismissedRecap, setDismissedRecap] =
+    useState<GameHudState['deathRecap']>(null);
   const [setupOpen, setSetupOpen] = useState(false);
   const [onlineOpen, setOnlineOpen] = useState(false);
+  const [onlineInMatch, setOnlineInMatch] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameRef = useRef<
     | (OnlineGame & {
@@ -525,14 +529,13 @@ export function GameShell() {
     botScoresRef.current = [0, 0];
     botXpRef.current.begin();
     gameRef.current?.setPreMatchLocked(false);
-    const voted = chooseVotedMap(
-      teamSizeRef.current,
-      [mapRef.current, ...botVotesRef.current],
-      Math.floor(Math.random() * 100),
-    );
-    mapRef.current = voted;
-    setMapId(voted);
-    gameRef.current?.setArenaMap(voted);
+    const choices = mapsForTeams(teamSizeRef.current);
+    const selectedMap = choices.includes(mapRef.current)
+      ? mapRef.current
+      : choices[0];
+    mapRef.current = selectedMap;
+    setMapId(selectedMap);
+    gameRef.current?.setArenaMap(selectedMap);
     gameRef.current?.setBotTeamSize(teamSizeRef.current);
     gameRef.current?.playAgain();
   }
@@ -559,29 +562,23 @@ export function GameShell() {
   }
 
   return (
-    <main className={`game-shell ${started ? 'bot-match' : ''}`}>
+    <main
+      className={`game-shell ${started ? 'bot-match' : ''} ${onlineOpen && onlineInMatch ? 'online-match' : ''} ${!started && !selecting && (setupOpen || onlineOpen) && !(onlineOpen && onlineInMatch) ? 'setup-view' : ''}`}
+    >
       <canvas
         ref={canvasRef}
         className="game-canvas"
         aria-label="Edgefront Arena game"
       />
-      <div className="brand-mark">Edgefront</div>
-      {!selecting && status === 'ready' && (
-        <nav className="game-quick-menu" aria-label="Quick access">
-          <button onClick={openArmory} aria-keyshortcuts="B">
-            <kbd>B</kbd> Armory
-          </button>
-          <button onClick={openCareer} aria-keyshortcuts="L">
-            <kbd>L</kbd> Levels
-          </button>
-          <button onClick={openCosmetics} aria-keyshortcuts="K">
-            <kbd>K</kbd> Cosmetics
-          </button>
-          <button onClick={openCharacterShop} aria-keyshortcuts="H">
-            <kbd>H</kbd> Character shop{daily.available ? ' · Reward' : ''}
-          </button>
-        </nav>
-      )}
+      <GameHeader
+        compact={started || (onlineOpen && onlineInMatch)}
+        visible={!selecting && status === 'ready'}
+        dailyReward={daily.available}
+        onArmory={openArmory}
+        onLevels={openCareer}
+        onCosmetics={openCosmetics}
+        onCharacter={openCharacterShop}
+      />
       {!selecting && !setupOpen && !onlineOpen && (
         <div className={`career-dock ${started ? 'match' : 'lobby'}`}>
           {!started && (
@@ -652,10 +649,10 @@ export function GameShell() {
 
       {started && (
         <div className="combat-hud" aria-live="polite">
-          <AimOverlay scoped={hud.scoped} />
+          {!hud.dead && !hud.spectator && <AimOverlay scoped={hud.scoped} />}
           <section
             className="scoreboard"
-            aria-label={`Match score: ${playerName || 'Player1'} ${hud.playerScore}, Rook ${hud.botScore}. First to 5.`}
+            aria-label={`Match score: ${teamSize === 1 ? playerName || 'Player1' : 'Cyan team'} ${hud.playerScore}, ${teamSize === 1 ? 'Rook' : 'Coral team'} ${hud.botScore}. First to 5.`}
           >
             <div className="score-side player-side">
               <span>
@@ -673,14 +670,42 @@ export function GameShell() {
               <strong>{hud.botScore}</strong>
             </div>
           </section>
-          {teamSize > 1 && hud.teamAlive && (
-            <div className="bot-team-status">
-              CYAN {hud.teamAlive.slice(0, teamSize).filter(Boolean).length}/
-              {teamSize} alive · CORAL{' '}
-              {hud.teamAlive.slice(teamSize).filter(Boolean).length}/{teamSize}{' '}
-              alive
-            </div>
+          {hud.participants && (
+            <MatchRoster
+              players={hud.participants.map((p) =>
+                p.slot === 0
+                  ? { ...p, name: playerName || 'Player1', level: career.level }
+                  : p,
+              )}
+              localSlot={0}
+              team={teamSize > 1 ? 0 : undefined}
+              spectator={hud.spectator}
+              onSelect={(slot) => gameRef.current?.spectatePlayer(slot)}
+            />
           )}
+          {teamSize > 1 && hud.participants && (
+            <MatchRoster
+              players={hud.participants}
+              localSlot={0}
+              team={1}
+              opposing
+              spectator={hud.spectator}
+              onSelect={(slot) => gameRef.current?.spectatePlayer(slot)}
+            />
+          )}
+          {hud.spectator &&
+            (!hud.dead ||
+              hud.deathRecap === dismissedRecap ||
+              !hud.deathRecap) && (
+              <SpectatorControls
+                state={hud.spectator}
+                intermission={!!hud.teamIntermission || teamSize === 1}
+                onCycle={(direction) =>
+                  gameRef.current?.cycleSpectator(direction)
+                }
+                onRecap={hud.deathRecap ? () => setRecapOpen(true) : undefined}
+              />
+            )}
           {hud.damageId > 0 && (
             <div
               key={hud.damageId}
@@ -848,16 +873,18 @@ export function GameShell() {
             </div>
             <div className="health-caption">HP / {hud.maxHealth}</div>
           </div>
-          <div className="health-panel bot-health-panel">
-            <div className="health-heading">
-              <span>Rook · {DIFFICULTIES[difficulty].label}</span>
-              <strong>{hud.botHealth}</strong>
+          {teamSize === 1 && (
+            <div className="health-panel bot-health-panel">
+              <div className="health-heading">
+                <span>Rook · {DIFFICULTIES[difficulty].label}</span>
+                <strong>{hud.botHealth}</strong>
+              </div>
+              <div className="health-track">
+                <i style={{ width: `${hud.botHealth}%` }} />
+              </div>
+              <div className="health-caption">HP / 100</div>
             </div>
-            <div className="health-track">
-              <i style={{ width: `${hud.botHealth}%` }} />
-            </div>
-            <div className="health-caption">HP / 100</div>
-          </div>
+          )}
           <span className="bot-map-label">
             {ARENA_MAPS[mapId].name} · {ARENA_MAPS[mapId].difficulty} terrain
           </span>
@@ -878,7 +905,7 @@ export function GameShell() {
               onClose={() => setRecapOpen(false)}
             />
           )}
-          {hud.dead && (
+          {hud.dead && hud.deathRecap && hud.deathRecap !== dismissedRecap && (
             <div className="respawn-overlay">
               <strong>Eliminated</strong>
               <span>
@@ -886,7 +913,13 @@ export function GameShell() {
                   ? 'Your team is still fighting · next round after team elimination'
                   : 'Intermission · 3 seconds'}
               </span>
-              {hud.deathRecap && <DeathRecap recap={hud.deathRecap} />}
+              {hud.deathRecap && (
+                <DeathRecap
+                  recap={hud.deathRecap}
+                  onClose={() => setDismissedRecap(hud.deathRecap)}
+                  onPlaybackComplete={() => setDismissedRecap(hud.deathRecap)}
+                />
+              )}
             </div>
           )}
           {hud.roundWon && hud.result === 'none' && (
@@ -1091,6 +1124,8 @@ export function GameShell() {
           game={gameRef.current}
           loadout={loadoutChoices}
           paused={hud.paused}
+          spectator={hud.spectator ?? null}
+          onMatchStateChange={setOnlineInMatch}
           ammo={hud}
           onNameChange={setPlayerName}
           onBack={() => {
@@ -1102,28 +1137,30 @@ export function GameShell() {
       {!started && setupOpen && !onlineOpen && (
         <section className="start-screen" aria-labelledby="game-title">
           <div className="start-card">
-            <button
-              className="primary-button shop-open-button"
-              onClick={() => setSetupOpen(false)}
-            >
-              Back to lobby
-            </button>
-            <button
-              className="primary-button shop-open-button"
-              disabled={status !== 'ready'}
-              onClick={() => {
-                if (document.pointerLockElement) document.exitPointerLock();
-                setOnlineOpen(true);
-              }}
-            >
-              Online · 1v1 to 5v5
-            </button>
-            <button
-              className="primary-button shop-open-button"
-              onClick={openCareer}
-            >
-              Level rewards & cosmetics
-            </button>
+            <div className="setup-actions">
+              <button
+                className="primary-button shop-open-button"
+                onClick={() => setSetupOpen(false)}
+              >
+                Back to lobby
+              </button>
+              <button
+                className="primary-button shop-open-button"
+                disabled={status !== 'ready'}
+                onClick={() => {
+                  if (document.pointerLockElement) document.exitPointerLock();
+                  setOnlineOpen(true);
+                }}
+              >
+                Online · 1v1 to 5v5
+              </button>
+              <button
+                className="primary-button shop-open-button"
+                onClick={openCareer}
+              >
+                Level rewards & cosmetics
+              </button>
+            </div>
             <p className="eyebrow">Team training protocol</p>
             <h1 id="game-title">
               Edgefront <span>Arena</span>
@@ -1139,12 +1176,6 @@ export function GameShell() {
                 teamSizeRef.current = size;
                 setTeamSize(size);
                 const choices = mapsForTeams(size);
-                const votes = Array.from(
-                  { length: size * 2 - 1 },
-                  () => choices[Math.floor(Math.random() * choices.length)],
-                );
-                botVotesRef.current = votes;
-                setBotVotes(votes);
                 const id = choices[0];
                 mapRef.current = id;
                 setMapId(id);
@@ -1158,17 +1189,9 @@ export function GameShell() {
                 setMapId(id);
               }}
             />
-            <p className="bot-votes">
-              Map vote ·{' '}
-              {mapsForTeams(teamSize)
-                .map(
-                  (id) =>
-                    `${ARENA_MAPS[id].name}: ${botVotes.filter((v) => v === id).length + (mapId === id ? 1 : 0)}`,
-                )
-                .join(' · ')}
-              <br />
-              Your selection is your vote. Bots cast the other votes; tied maps
-              are chosen at random.
+            <p className="bot-map-note">
+              Bot training uses your selected map. Map voting is for online
+              matches.
             </p>
             <fieldset className="difficulty-picker">
               <legend>Rook difficulty</legend>

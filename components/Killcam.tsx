@@ -7,10 +7,16 @@ import type { CharacterAppearance } from '@/game/storeCatalog';
 export function Killcam({
   replay,
   profiles,
+  onComplete,
 }: {
   replay: KillReplay;
+  onComplete?: () => void;
   profiles?: { cosmetics: Cosmetics; character?: CharacterAppearance }[];
 }) {
+  const complete = useRef(onComplete);
+  useEffect(() => {
+    complete.current = onComplete;
+  }, [onComplete]);
   const canvas = useRef<HTMLCanvasElement>(null),
     seek = useRef(0),
     playing = useRef(true);
@@ -297,6 +303,9 @@ export function Killcam({
           if (time === duration && playing.current) {
             playing.current = false;
             setIsPlaying(false);
+            queueMicrotask(() => {
+              if (!disposed) complete.current?.();
+            });
           }
           const rounded = Math.round((time / duration) * 100);
           if (rounded !== lastUi) {

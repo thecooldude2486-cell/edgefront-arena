@@ -167,3 +167,130 @@
     max-height: 120px;
   }
 }
+
+.online-map-voting {
+  margin: 18px 0;
+}
+.online-map-voting > p {
+  color: #aac5d1;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.map-vote-summary {
+  display: block;
+  font: 700 13px monospace;
+  color: #8be6ed;
+}
+.map-vote .map-artwork {
+  height: 84px;
+}
+.map-vote button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.selected-map-result {
+  padding: 12px;
+  border: 1px solid #35d5ea55;
+  background: #102d3c;
+  color: #aac5d1;
+}
+.selected-map-result strong {
+  color: #8be6ed;
+}
+.bot-map-note {
+  font-size: 12px;
+  color: #aac5d1;
+  line-height: 1.6;
+}
+
+.team-size-picker > div {
+  flex-wrap: wrap;
+}
+.team-preference-picker {
+  min-width: 0;
+  margin: 16px 0;
+  padding: 14px;
+  border: 1px solid #315366;
+  color: #b8d6e2;
+}
+.team-preference-picker > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.team-preference-picker button,
+.team-lobby-roster button {
+  padding: 9px 13px;
+  border: 1px solid #4a7182;
+  border-radius: 5px;
+  background: #102d3c;
+  color: #dcebf0;
+  cursor: pointer;
+  font: 12px monospace;
+}
+.team-preference-picker button[aria-pressed='true'] {
+  border-color: #35d5ea;
+  background: #174351;
+}
+.team-preference-picker p {
+  color: #aac5d1;
+  font-size: 11px;
+  line-height: 1.6;
+  margin-bottom: 0;
+}
+.cyan-choice {
+  color: #8be6ed;
+}
+.coral-choice {
+  color: #ffa6ab;
+}
+.team-preference-picker button.coral-choice[aria-pressed='true'] {
+  border-color: #ffa6ab;
+  background: #482732;
+}
+.team-lobby-roster > section {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #315366;
+  border-radius: 5px;
+  background: #07192688;
+}
+.team-lobby-roster strong {
+  display: block;
+  font: 12px monospace;
+  margin-bottom: 8px;
+}
+.team-lobby-roster span {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.team-lobby-roster button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.team-assignment {
+  display: block;
+  margin: 12px 0;
+  padding: 10px 12px;
+  background: #102d3c;
+  border-left: 3px solid #35d5ea;
+  color: #b7f3fd;
+  font: 12px/1.6 monospace;
+}
+.join-room-heading {
+  margin-top: 26px;
+  font-size: 20px;
+  border-top: 1px solid #315366;
+  padding-top: 20px;
+}
+.team-preference-picker button:focus-visible,
+.team-lobby-roster button:focus-visible {
+  outline: 2px solid #35d5ea;
+  outline-offset: 3px;
+}
+@media (max-width: 420px) {
+  .team-lobby-roster {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+}

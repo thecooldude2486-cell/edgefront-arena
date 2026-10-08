@@ -1,3 +1,4 @@
+import { createSpectator, type SpectatorActor } from './createSpectator';
 import {teamSpawn,teamOf,mapScale,type TeamSize} from './teams';
 import {createReplayBuffer} from './killReplay';
 import {FALL_DEATH_Y,barrelDamage,type EnvironmentState} from './arenaEnvironment';
@@ -57,6 +58,7 @@ import { classifyBotHit } from './headshots';
 import { createMolotovs } from './createMolotov';
 import { createGrenades } from './createGrenade';
 import { createBot } from './createBot';
+import { createBotNavigation } from './createBotNavigation';
 import type { Difficulty } from './difficulty';
 import { createSlide, SLIDE } from './createSlide';
 import { createGrapple } from './createGrapple';
@@ -125,6 +127,7 @@ export function createGame(
   camera.keysRight = [];
   camera.attachControl(canvas, true);
   scene.activeCamera = camera;
+  const spectator = createSpectator(scene, state => onHudUpdate({ spectator: state }));
 
   const skyLight = new HemisphericLight(
     'soft arena light',
@@ -232,6 +235,7 @@ export function createGame(
     }
   }
   function resetPlayerPosition() {
+    spectator.stop();
     roundPerformance.reset(performance.now());
     incomingDamage.reset();replay.reset();botPerformance.reset(performance.now());enemyReplays.forEach(b=>b.reset());enemyPerformance.forEach(p=>p.reset(performance.now()));
     blastAirborne = false;
@@ -274,11 +278,34 @@ export function createGame(
   let teamOnlineSlot:number|null=null,teamOnlineSize=1;
   const teamRemoteVisible=new Set<number>();
   const teamRemotes=new Map<number,ReturnType<typeof createRemotePlayer>>();
+  let onlineRoster:import('./teamProtocol').TeamPlayer[]=[];
+  let onlineRoundOver=false;
+  function botRoster():SpectatorActor[]{
+    return [{slot:0,team:0,name:'Player1',health:playerHealth,connected:true,weapon:weapon?.id??'assaultRifle',pose:()=>({x:playerCollider.position.x,y:playerCollider.position.y,z:playerCollider.position.z,yaw:camera.rotation.y,pitch:camera.rotation.x})},
+      ...[{bot,slot:botTeamSize,name:'Rook'},...teamUnits].map(u=>({slot:u.slot,team:teamOf(u.slot,botTeamSize),name:u.name,health:u.bot.health,connected:true,weapon:'assaultRifle' as WeaponId,pose:()=>({x:u.bot.root.position.x,y:u.bot.root.position.y,z:u.bot.root.position.z,yaw:u.bot.root.rotation.y+Math.PI,pitch:0})}))].sort((a,b)=>a.slot-b.slot);
+  }
+  function updateSpectatorRoster(){
+    if(teamOnlineSlot!==null){
+      spectator.setRoster(onlineRoster.map(p=>({slot:p.slot,team:teamOf(p.slot,teamOnlineSize),name:p.name,health:p.health,connected:p.connected,weapon:p.weapon,level:p.profile.level,kills:p.kills,deaths:p.deaths,pose:()=>p.slot===teamOnlineSlot?p.pose:teamRemotes.get(p.slot)?.readPose()??null})),teamOnlineSlot,onlineRoundOver);
+    }else if(bot&&!inLobby){spectator.setRoster(botRoster(),0,teamIntermission||botTeamSize===1);}
+  }
+  function beginSpectating(){
+    if(inLobby||playerHealth>0)return;
+    pressed.clear();jumpQueued=false;horizontalVelocity.setAll(0);verticalVelocity=0;slide.cancel();grapple.cancel();
+    weapon?.setActive(false);characterHands.root.setEnabled(false);camera.detachControl();camera.cameraRotation.setAll(0);
+    if(document.pointerLockElement===canvas)document.exitPointerLock();
+    updateSpectatorRoster();spectator.start();spectator.update(0);
+  }
   function unitHealth(){return [playerHealth,...teamUnits.filter(u=>u.slot<botTeamSize).map(u=>u.bot.health),bot.health,...teamUnits.filter(u=>u.slot>=botTeamSize).map(u=>u.bot.health)];}
-  function updateTeamHud(){if(botTeamSize>1)onHudUpdate({teamIntermission,teamAlive:unitHealth().map(h=>h>0),teamSize:botTeamSize});}
+  function updateTeamHud(){
+    if(!bot||inLobby||onlinePlayer)return;
+    onHudUpdate({teamIntermission,teamAlive:unitHealth().map(h=>h>0),teamSize:botTeamSize,participants:botRoster().map(({pose:_pose,...p})=>p)});
+    updateSpectatorRoster();
+  }
   function finishTeamRound(winner:number){
     if(teamIntermission||gameOver||inLobby)return;teamIntermission=true;
     if(winner===0)playerScore++;else botScore++;
+    updateSpectatorRoster();
     playerAlive=false;weapon?.setActive(false);camera.detachControl();
     onHudUpdate({teamIntermission:true,playerScore,botScore,roundWon:winner===0,dead:winner!==0,elimination:roundPerformance.read(playerHealth,performance.now())});
     if(playerScore>=5||botScore>=5){endMatch(winner===0?'victory':'defeat');return;}
@@ -297,12 +324,14 @@ export function createGame(
   }
   function buildTeamUnits(size:TeamSize){
     teamUnits.splice(0).forEach(u=>u.bot.dispose());enemyPerformance.clear();enemyReplays.clear();botTeamSize=size;lastKillerSlot=size;teamIntermission=false;
+    const navigation = size > 1 ? createBotNavigation(scene, mapScale(arenaMap)) : null;
+    bot.configureTeam(size, size, mapScale(arenaMap), navigation);
     for(let slot=1;slot<size*2;slot++){
       if(slot===size)continue;
       enemyPerformance.set(slot,createCombatPerformance(performance.now()));
       const unit:Unit={slot,target:-1,name:slot<size?`Ally ${slot}`:`Rook ${slot-size+1}`,bot:null!};
       unit.bot=createBot(scene,camera,{onEliminated:checkTeamRound,onHealthChange:()=>updateTeamHud(),isPlayerAlive:()=>true,onPlayerHit:(id,zone)=>hitUnitTarget(unit.target,id,zone,unit.name),onShot:(origin,direction)=>{enemyPerformance.get(slot)?.shot();captureReplay();enemyReplays.get(slot)?.capture(performance.now(),[{pose:{x:playerCollider.position.x,y:playerCollider.position.y,z:playerCollider.position.z,yaw:camera.rotation.y,pitch:camera.rotation.x},health:playerHealth,weapon:weapon?.id??'assaultRifle'},{pose:{x:unit.bot.root.position.x,y:unit.bot.root.position.y,z:unit.bot.root.position.z,yaw:unit.bot.root.rotation.y+Math.PI,pitch:0},health:unit.bot.health,weapon:'assaultRifle'}],{actor:1,origin:{x:origin.x,y:origin.y,z:origin.z},direction:{x:direction.x,y:direction.y,z:direction.z}},arena.environment.state);},onEnvironmentHit:(mesh,id)=>arena.environment.hit(mesh,getWeaponDamage(id,'body'),p=>oilExplosion(p,true))},getDifficulty);
-      unit.bot.setTeam(teamOf(slot,size));unit.bot.setAutoRespawn(false);unit.bot.setPatrolRoute(ARENA_MAPS[arenaMap].patrol);teamUnits.push(unit);
+      unit.bot.setTeam(teamOf(slot,size));unit.bot.configureTeam(slot,size,mapScale(arenaMap),navigation);unit.bot.setAutoRespawn(false);unit.bot.setPatrolRoute(ARENA_MAPS[arenaMap].patrol);teamUnits.push(unit);
     }
     resetTeamUnits();updateTeamHud();
   }
@@ -311,13 +340,19 @@ export function createGame(
   }
   function updateTeamBots(dt:number,now:number){
     if(teamIntermission)return;
-    const units=[{slot:0,alive:playerAlive,position:playerCollider.position}, {slot:botTeamSize,alive:bot.alive,position:bot.root.position},...teamUnits.map(u=>({slot:u.slot,alive:u.bot.alive,position:u.bot.root.position}))];
-    for(const u of [{bot,slot:botTeamSize,target:rookTarget},...teamUnits]){
+    const bots = [{bot,slot:botTeamSize,target:rookTarget},...teamUnits];
+    const units = [{slot:0,alive:playerAlive,position:playerCollider.position.clone()},
+      ...bots.map(u=>({slot:u.slot,alive:u.bot.alive,position:u.bot.root.position.clone(),target:u.target}))];
+    // Decide from one frame snapshot before anyone moves or fires.
+    for(const u of bots){
       if(!u.bot.alive)continue;
-      const targets=units.filter(t=>t.alive&&teamOf(t.slot,botTeamSize)!==teamOf(u.slot,botTeamSize)).sort((a,b)=>Vector3.DistanceSquared(a.position,u.bot.root.position)-Vector3.DistanceSquared(b.position,u.bot.root.position));
-      const target=targets[0];u.target=target?.slot??-1;if(u.bot===bot)rookTarget=u.target;
-      u.bot.setTarget(target?target.position.add(new Vector3(0,.8,0)):u.bot.root.position,Boolean(target));
-      u.bot.update(dt,now);if(u.bot.root.position.y<FALL_DEATH_Y)u.bot.takeHazardDamage(100);
+      u.target=u.bot.planTeamStep(units,now);
+      if(u.bot===bot)rookTarget=u.target;
+    }
+    for(const u of bots){
+      if(!u.bot.alive||teamIntermission)continue;
+      u.bot.update(dt,now);
+      if(u.bot.root.position.y<FALL_DEATH_Y)u.bot.takeHazardDamage(100);
     }
     checkTeamRound();
   }
@@ -342,7 +377,7 @@ export function createGame(
 
   const botEntry=createMatchEntry(()=>document.pointerLockElement===canvas,()=>canvas.requestPointerLock(),onHudUpdate);
   function requestMouseLock() {
-    if (preMatchLocked || networkPaused) return;
+    if (preMatchLocked || networkPaused || !playerAlive) return;
     // Embedded preview browsers may reject pointer lock. Keep that failure graceful.
     if (document.pointerLockElement===canvas) return;
     try { Promise.resolve(canvas.requestPointerLock()).catch(() => onHudUpdate({ paused: true })); }
@@ -392,6 +427,7 @@ export function createGame(
       health: displayedPlayerHealth,
       damageId: ++damageId,
     });
+    updateTeamHud();
     if (playerHealth > 0) return;
 
     playerAlive = false;
@@ -403,6 +439,7 @@ export function createGame(
     const recap={...incomingDamage.read(source==='fall'?'The void':source==='oilBarrel'?'Oil barrel':lastAttacker,killerHealth,roundPerformance.read(0,performance.now()).damageDealt),killerStats:(enemyPerformance.get(lastKillerSlot)??botPerformance).read(killerHealth,performance.now()),replay:(enemyReplays.get(lastKillerSlot)??replay).read(arenaMap,source==='fall'||source==='oilBarrel'&&!oilKillerBot?0:1,arena.environment.state.barrelHealth,arena.environment.state.seconds)};
     if(recap.replay)recap.replay.botActor=1;
     onHudUpdate({ deathRecap:{...recap,replayProfiles:[{level:1,cosmetics:getCosmetics(),character:playerAppearance},{level:1,cosmetics:EMPTY_COSMETICS}]}, dead: true, roundWon: false, botScore, paused: false, elimination:roundPerformance.read(0,performance.now()) });
+    beginSpectating();
     if(botTeamSize>1){checkTeamRound();return;}
     if (botScore >= MATCH.scoreToWin) {
       endMatch('defeat');
@@ -467,7 +504,7 @@ export function createGame(
         });
       }, BOT.respawnMs);
     },
-    onHealthChange: (botHealth) => onHudUpdate({ botHealth }),
+    onHealthChange: (botHealth) => {onHudUpdate({ botHealth });updateTeamHud();},
     onPlayerHit: (id,zone)=>{if(botTeamSize>1)hitUnitTarget(rookTarget,id,zone,'Rook');else {lastAttacker='Rook';damagePlayer(id,zone);}},
     onShot:(origin,direction)=>{botPerformance.shot();captureReplay({actor:1,origin:{x:origin.x,y:origin.y,z:origin.z},direction:{x:direction.x,y:direction.y,z:direction.z}});},
     onEnvironmentHit:(mesh,id)=>{if(matchActive&&(playerAlive||botTeamSize>1)&&!gameOver)arena.environment.hit(mesh,getWeaponDamage(id,'body'),point=>oilExplosion(point,true));},
@@ -717,7 +754,7 @@ export function createGame(
       camera.rotation.z = 0;
     }
     if (locked) {
-      if (preMatchLocked || networkPaused) { document.exitPointerLock(); return; }
+      if (preMatchLocked || networkPaused || !playerAlive) { document.exitPointerLock(); return; }
       camera.attachControl(canvas, true);
       onHudUpdate({ paused: false, awaitingFirstInput: false });
     } else if (matchActive && !gameOver && playerAlive) {
@@ -731,9 +768,10 @@ export function createGame(
   document.addEventListener('pointerlockchange', onPointerLockChange);
 
   scene.onBeforeRenderObservable.add(() => {
-    if (preMatchLocked || networkPaused) return;
+    const frameSeconds = engine.getDeltaTime() / 1000;
+    const deltaSeconds = Math.min(frameSeconds, 0.05);
+    if (preMatchLocked || networkPaused) { spectator.update(frameSeconds); return; }
     const now = performance.now();
-    const deltaSeconds = Math.min(engine.getDeltaTime() / 1000, 0.05);
     if (inLobby) lobby.update(now);
     if (onlinePlayer) {remotePlayer.update(deltaSeconds);teamRemotes.forEach(r=>r.update(deltaSeconds));}
     const nearbyPart = inLobby ? lobby.secrets.nearby(camera.position)?.name ?? null : null;
@@ -760,10 +798,10 @@ export function createGame(
       lastBoostHud = boostHud;
       onHudUpdate({ swordBoostState: swordBoost.state, swordBoostSeconds: swordBoost.seconds });
     }
-    if(!inLobby&&matchActive&&playerAlive&&!gameOver&&(onlinePlayer?environmentRunning:canMove)){
+    if(!inLobby&&matchActive&&!gameOver&&(playerAlive||!onlinePlayer&&botTeamSize>1&&!teamIntermission)&&(onlinePlayer?environmentRunning:canMove||botTeamSize>1&&!playerAlive)){
       environmentSeconds+=deltaSeconds;
       arena.environment.update(environmentSeconds,deltaSeconds);
-      if(grounded&&verticalVelocity<=0){const carry=arena.environment.carry(playerCollider.position,PLAYER.colliderHalfHeight);playerCollider.moveWithCollisions(carry);}
+      if(playerAlive&&grounded&&verticalVelocity<=0){const carry=arena.environment.carry(playerCollider.position,PLAYER.colliderHalfHeight);playerCollider.moveWithCollisions(carry);}
     }
     const grappleVelocity = grapple.update(deltaSeconds);
     if (wasGrappling && !grapple.active) { horizontalVelocity.setAll(0); verticalVelocity = 0; }
@@ -863,7 +901,7 @@ export function createGame(
       verticalVelocity = grappleVelocity.y;
     }
     const positionBeforeMove = playerCollider.position.clone();
-    playerCollider.moveWithCollisions(
+    if(playerAlive) playerCollider.moveWithCollisions(
       new Vector3(
         horizontalVelocity.x * deltaSeconds,
         verticalVelocity * deltaSeconds,
@@ -929,6 +967,7 @@ export function createGame(
       captureReplay();
     }
 
+    spectator.update(frameSeconds);
     if(playerCollider.position.y<FALL_DEATH_Y){
       if(inLobby)resetPlayerPosition();
       else if(onlinePlayer)playerCollider.position.y=Math.max(-12,playerCollider.position.y);
@@ -940,7 +979,7 @@ export function createGame(
     networkPaused=false;
     botEntry.reset();
     onlineTracers.clear();
-    onlinePlayer = null;teamOnlineSlot=null;teamRemotes.forEach(r=>r.hide());teamUnits.forEach(u=>u.bot.root.setEnabled(false)); remotePlayer.hide();
+    onlinePlayer = null;teamOnlineSlot=null;onlineRoster=[];teamRemotes.forEach(r=>r.hide());teamUnits.forEach(u=>u.bot.root.setEnabled(false)); remotePlayer.hide();
     weapon?.setVisualOnly(false);
     weapon?.setCombatEnabled(true);
     if (playerRespawnTimer) clearTimeout(playerRespawnTimer);
@@ -982,17 +1021,21 @@ export function createGame(
       if (document.pointerLockElement === canvas) document.exitPointerLock();
     },
     enterLobby,
+    spectatePlayer: (slot:number) => spectator.select(slot),
+    cycleSpectator: (direction:number) => spectator.cycle(direction),
     setBotTeamSize:(size:TeamSize)=>{buildTeamUnits(size);},
     enterTeamOnline:(slot:number,size:number)=>{
       enterLobby();onlinePlayer=slot<size?1:2;teamOnlineSlot=slot;teamOnlineSize=size;teamRemoteVisible.clear();teamRemotes.forEach(r=>r.hide());inLobby=false;matchActive=true;playerAlive=true;gameOver=false;
       restorePlayerHealth();resetPlayerPosition();const p=teamSpawn(slot,size,arenaMap);playerCollider.position.set(p.x,p.y,p.z);camera.position.set(p.x,p.y+.82,p.z);camera.rotation.set(0,p.yaw,0);
       remotePlayer.hide();bot.root.setEnabled(false);teamUnits.forEach(u=>u.bot.root.setEnabled(false));weapon?.setVisualOnly(true);weapon?.setCombatEnabled(true);weapon?.setActive(true);onHudUpdate({paused:true});
     },
-    receiveTeamRoster:(players:import('./teamProtocol').TeamPlayer[])=>{
+    receiveTeamRoster:(players:import('./teamProtocol').TeamPlayer[],roundOver=false)=>{
       if(teamOnlineSlot===null)return;
+      onlineRoster=players;onlineRoundOver=roundOver;
       for(const p of players){if(p.slot===teamOnlineSlot)continue;let remote=teamRemotes.get(p.slot);if(!remote){remote=createRemotePlayer(scene);teamRemotes.set(p.slot,remote);}if(!p.pose||p.health<=0||!p.connected){remote.hide();teamRemoteVisible.delete(p.slot);continue;}
         if(teamRemoteVisible.has(p.slot))remote.receive(p.pose);else{remote.show(p.pose);teamRemoteVisible.add(p.slot);}remote.equip(p.weapon);remote.setCosmetics(p.profile.cosmetics);if(p.profile.character)remote.setCharacterAppearance(p.profile.character);
       }
+      updateSpectatorRoster();
     },
     receiveTeamEffect:(slot:number,data:OnlineEffect)=>{if(teamOnlineSlot===null||slot===teamOnlineSlot)return;const remote=teamRemotes.get(slot);if(!remote)return;
       if(data.action!=='fire'){remote.reload(data.weapon,data.action==='reload');return;}remote.fire(data.weapon);
@@ -1000,7 +1043,7 @@ export function createGame(
     },
     setOnlineEnvironment:(state:EnvironmentState,running:boolean)=>{
       environmentSeconds=state.seconds;environmentRunning=running;
-      const standing=arena.environment.platforms.find(p=>grounded&&Math.abs(playerCollider.position.y-PLAYER.colliderHalfHeight-(p.mesh.position.y+.175))<.22&&Math.abs(playerCollider.position.x-p.mesh.position.x)<1.8*mapScale(arenaMap)&&Math.abs(playerCollider.position.z-p.mesh.position.z)<1.8*mapScale(arenaMap));
+      const standing=arena.environment.platforms.find(p=>playerAlive&&grounded&&Math.abs(playerCollider.position.y-PLAYER.colliderHalfHeight-(p.mesh.position.y+.175))<.22&&Math.abs(playerCollider.position.x-p.mesh.position.x)<1.8*mapScale(arenaMap)&&Math.abs(playerCollider.position.z-p.mesh.position.z)<1.8*mapScale(arenaMap));
       const previous=standing?.mesh.position.clone();
       arena.environment.apply(state,true);
       if(standing&&previous)playerCollider.moveWithCollisions(standing.mesh.position.subtract(previous));
@@ -1049,10 +1092,13 @@ export function createGame(
     }),
     setOnlineHealth: (health: number, opponentHealth: number) => {
       if (!onlinePlayer) return;
+      const wasAlive=playerAlive;
       playerHealth = Math.max(0, Math.min(100, health));
       playerAlive = playerHealth > 0;
       onlineOpponentAlive = opponentHealth > 0;
       if (!playerAlive) { weapon?.setActive(false); weapon?.setCombatEnabled(false); pressed.clear(); }
+      if(!playerAlive&&teamOnlineSlot!==null)beginSpectating();
+      else if(playerAlive&&!wasAlive)spectator.stop();
       if (!onlineOpponentAlive) remotePlayer.hide();
       onHudUpdate({ health: playerHealth, dead: !playerAlive });
     },
@@ -1089,7 +1135,7 @@ export function createGame(
       onHudUpdate({deathRecap:null});
       preMatchLocked=false;
       weapon?.setCosmetics(getCosmetics());
-      onlinePlayer = null;teamOnlineSlot=null;teamRemotes.forEach(r=>r.hide());teamUnits.forEach(u=>u.bot.root.setEnabled(false)); remotePlayer.hide();
+      onlinePlayer = null;teamOnlineSlot=null;onlineRoster=[];teamRemotes.forEach(r=>r.hide());teamUnits.forEach(u=>u.bot.root.setEnabled(false)); remotePlayer.hide();
       weapon?.setVisualOnly(false);
       weapon?.setCombatEnabled(true);
       inLobby = false;
@@ -1120,9 +1166,11 @@ export function createGame(
         paused: false,
         awaitingFirstInput: document.pointerLockElement!==canvas,
       });
+      updateTeamHud();
       botEntry.start();
     },
     dispose: () => {
+      spectator.dispose();
       teamUnits.forEach(u=>u.bot.dispose());teamRemotes.forEach(r=>r.dispose());
       remotePlayer.dispose(); characterHands.dispose();
       onlineTracers.dispose();

@@ -1,10 +1,28 @@
-import { ARENA_MAPS, type ArenaMapId } from './maps.ts';
+import { ARENA_MAPS, MODE_MAPS, type ArenaMapId } from './maps.ts';
 export const INTERMISSION_MS = 3000;
 export const KILLCAM_SECONDS = 3;
 export type TeamSize = 1 | 2 | 3 | 4 | 5;
 export function isTeamSize(value: unknown): value is TeamSize {
   return Number.isInteger(value) && Number(value) >= 1 && Number(value) <= 5;
 }
+export type TeamPreference = 'auto' | 0 | 1;
+// Reconnect reservations count as occupied. A preference never increases team capacity.
+export function selectTeamSlot(
+  occupied: readonly unknown[],
+  size: number,
+  preference: unknown = 'auto',
+): number {
+  if (!isTeamSize(size) || occupied.length !== size * 2) return -1;
+  if (size === 1 || (preference !== 0 && preference !== 1))
+    return occupied.findIndex((value) => !value);
+  for (const team of [preference, 1 - preference]) {
+    for (let slot = team * size; slot < (team + 1) * size; slot++) {
+      if (!occupied[slot]) return slot;
+    }
+  }
+  return -1;
+}
+
 export function teamOf(slot: number, size: number) {
   return slot < size ? 0 : 1;
 }
@@ -12,11 +30,7 @@ export function mapScale(map: ArenaMapId) {
   return 'scale' in ARENA_MAPS[map] ? Number(ARENA_MAPS[map].scale) : 1;
 }
 export function mapsForTeams(size: number): ArenaMapId[] {
-  return size <= 1
-    ? ['switchyard', 'stadium', 'skyline', 'crossfire']
-    : size <= 3
-      ? ['foundry', 'relay']
-      : ['harbor', 'citadel'];
+  return [...MODE_MAPS[isTeamSize(size) ? size : 1]];
 }
 export function teamSpawn(slot: number, size: number, map: ArenaMapId) {
   const team = teamOf(slot, size),

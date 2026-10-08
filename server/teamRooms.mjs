@@ -12,6 +12,7 @@ import {
   isTeamSize,
   mapsForTeams,
   teamOf,
+  selectTeamSlot,
   teamSpawn,
   chooseVotedMap,
   winningTeam,
@@ -63,6 +64,7 @@ export function createTeamRooms(send) {
         slot: i,
         name: r.names[i],
         connected: !!r.peers[i],
+        occupied: !!r.tokens[i],
         ready: p.ready,
         health: p.health,
         pose: p.pose,
@@ -432,7 +434,8 @@ export function createTeamRooms(send) {
         };
       r.environment = newEnvironment(r.mapId);
       rooms.set(code, r);
-      join(r, s, 0);
+      join(r, s, selectTeamSlot(r.tokens, r.size, m.team));
+      teamNotice(r, s, m.team);
       return true;
     }
     if (m?.type === 'teamJoin') {
@@ -441,7 +444,11 @@ export function createTeamRooms(send) {
         send(s, { type: 'teamError', message: 'Team room not found.' });
         return true;
       }
-      const slot = r.tokens.findIndex((t) => !t);
+      if (roomFor(s) === r) {
+        state(r, s);
+        return true;
+      }
+      const slot = selectTeamSlot(r.tokens, r.size, m.team);
       if (slot < 0 || r.phase !== 'waiting') {
         send(s, {
           type: 'teamError',
@@ -451,6 +458,7 @@ export function createTeamRooms(send) {
       }
       if (roomFor(s)) leave(s, true);
       join(r, s, slot);
+      teamNotice(r, s, m.team);
       return true;
     }
     if (m?.type === 'teamResume') {
@@ -497,6 +505,49 @@ export function createTeamRooms(send) {
       send(s, { type: 'teamLeft' });
       return true;
     }
+    if (m.type === 'teamChoose') {
+      if (r.size === 1 || (m.team !== 0 && m.team !== 1)) return true;
+      if (r.phase !== 'waiting' || r.pausedAt) {
+        send(s, {
+          type: 'teamError',
+          message:
+            'Teams are locked once map voting starts, or during a reconnect pause.',
+        });
+        return true;
+      }
+      if (teamOf(slot, r.size) === m.team) {
+        teamNotice(r, s, m.team);
+        return true;
+      }
+      const available = r.tokens.map((token, i) => (i === slot ? null : token));
+      const destination = selectTeamSlot(available, r.size, m.team);
+      if (destination !== slot && destination >= 0) {
+        // Move the complete player identity; the session token must resume into the new seat.
+        for (const key of [
+          'peers',
+          'tokens',
+          'disconnected',
+          'names',
+          'profiles',
+          'combat',
+          'kills',
+          'deaths',
+          'votes',
+          'lastKiller',
+          'recaps',
+          'replays',
+        ]) {
+          [r[key][slot], r[key][destination]] = [
+            r[key][destination],
+            r[key][slot],
+          ];
+        }
+        tokens.set(r.tokens[destination], { code: r.code, slot: destination });
+        broadcast(r);
+      }
+      teamNotice(r, s, m.team);
+      return true;
+    }
     if (m.type === 'teamProfile') {
       const profile = readPlayerProfile(m.profile);
       if (profile) r.profiles[slot] = profile;
@@ -513,7 +564,11 @@ export function createTeamRooms(send) {
       return true;
     }
     if (m.type === 'teamVote') {
-      if (r.phase === 'voting' && mapsForTeams(r.size).includes(m.mapId)) {
+      if (
+        r.phase === 'voting' &&
+        !r.pausedAt &&
+        mapsForTeams(r.size).includes(m.mapId)
+      ) {
         r.votes[slot] = m.mapId;
         if (r.votes.every(Boolean)) closeVote(r);
         else broadcast(r);
@@ -615,6 +670,19 @@ export function createTeamRooms(send) {
       return true;
     }
     return true;
+  }
+  function teamNotice(r, s, preference) {
+    if (r.size === 1) return;
+    const assigned = teamOf(r.peers.indexOf(s), r.size);
+    const label = assigned === 0 ? 'Cyan' : 'Coral';
+    const fallback =
+      (preference === 0 || preference === 1) && assigned !== preference;
+    send(s, {
+      type: 'teamNotice',
+      message: fallback
+        ? `${preference === 0 ? 'Cyan' : 'Coral'} is full. You are on ${label} team.`
+        : `You are on ${label} team.`,
+    });
   }
   function join(r, s, slot) {
     r.peers[slot] = s;

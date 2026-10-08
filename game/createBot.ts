@@ -14,6 +14,8 @@ import {
   type WeaponId,
 } from './weaponDefinitions';
 import { BOT, COLORS, SPAWNS } from './config';
+import { createTeamBotBrain, type BotActor } from './createTeamBotBrain';
+import type { BotNavigation } from './createBotNavigation';
 import { DIFFICULTIES, NIGHTMARE_TACTICS, type Difficulty } from './difficulty';
 
 type BotCallbacks = {
@@ -160,6 +162,10 @@ export function createBot(
     autoRespawn = true;
   let targetOverride: { position: Vector3; alive: boolean } | null = null;
   const targetAlive = () => targetOverride?.alive ?? callbacks.isPlayerAlive();
+  let teamBrain: ReturnType<typeof createTeamBotBrain> | null = null;
+  let teamPlan: ReturnType<
+    ReturnType<typeof createTeamBotBrain>['plan']
+  > | null = null;
   let health = BOT.maxHealth;
   let alive = true;
   let patrolIndex = 0;
@@ -184,7 +190,8 @@ export function createBot(
     const ray = new Ray(eye, towardPlayer.normalize(), distance);
     const obstruction = scene.pickWithRay(ray, (mesh) => {
       return (
-        mesh.isEnabled() && mesh.checkCollisions &&
+        mesh.isEnabled() &&
+        mesh.checkCollisions &&
         mesh !== root &&
         mesh.metadata?.owner !== 'bot' &&
         mesh.metadata?.owner !== 'player'
@@ -282,6 +289,9 @@ export function createBot(
     aimHistory.length = 0;
     attackerPosition = null;
     alertSeconds = 0;
+    targetOverride = null;
+    teamBrain?.reset();
+    teamPlan = null;
   }
 
   function hurt(amount: number) {
@@ -313,6 +323,35 @@ export function createBot(
     },
     setTarget(position: Vector3 | null, alive = true) {
       targetOverride = position ? { position: position.clone(), alive } : null;
+    },
+    configureTeam(
+      slot: number,
+      size: number,
+      scale: number,
+      navigation: BotNavigation | null,
+    ) {
+      teamBrain =
+        size > 1 && navigation
+          ? createTeamBotBrain(slot, size, scale, navigation, hasLineOfSight)
+          : null;
+      teamPlan = null;
+      targetOverride = null;
+    },
+    planTeamStep(actors: readonly BotActor[], now: number) {
+      if (!teamBrain) return -1;
+      const previousTarget = teamPlan?.target?.slot;
+      teamPlan = teamBrain.plan(root.position, health, actors, now);
+      if (teamPlan.target?.slot !== previousTarget) {
+        sawPlayer = false;
+        aimHistory.length = 0;
+      }
+      targetOverride = {
+        position:
+          teamPlan.target?.position.add(new Vector3(0, 0.8, 0)) ??
+          root.position.clone(),
+        alive: Boolean(teamPlan.target),
+      };
+      return teamPlan.target?.slot ?? -1;
     },
     takeHazardDamage: hurt,
     setPatrolRoute(points: readonly (readonly [number, number])[]) {
@@ -352,7 +391,7 @@ export function createBot(
       if (canSeePlayer && !sawPlayer) {
         nextShotAt = Math.max(
           lastShotAt === -Infinity ? 0 : nextShotAt,
-          now + difficulty.reactionMs,
+          now + difficulty.reactionMs + (teamBrain?.reactionOffset ?? 0),
         );
         aimHistory.length = 0;
         aimHistory.push({ at: now, position: playerPosition.clone() });
@@ -371,7 +410,8 @@ export function createBot(
               ? toward.scale(-0.65)
               : Vector3.Zero();
         moveDirection = distanceControl.add(strafe.scale(0.72)).normalize();
-        fireAtPlayer(now, playerPosition, distance);
+        if (!teamPlan || teamPlan.canFire)
+          fireAtPlayer(now, playerPosition, distance);
       } else if (alerted && attackerPosition) {
         // Investigate the last revealed position, not a player hidden by walls.
         moveDirection = attackerPosition.subtract(root.position);
@@ -387,6 +427,7 @@ export function createBot(
         moveDirection = toPatrol.normalize();
       }
 
+      if (teamPlan) moveDirection = teamPlan.movement;
       if (moveDirection.lengthSquared() > 0.001) {
         const speed = canSeePlayer
           ? difficulty.moveSpeed
@@ -401,8 +442,10 @@ export function createBot(
         // The bot model faces along its negative local Z axis.
         root.rotation.y = Math.atan2(-moveDirection.x, -moveDirection.z);
       }
-      if (alerted && attackerPosition) {
-        const facing = attackerPosition.subtract(root.position);
+      if ((teamPlan?.target && canSeePlayer) || (alerted && attackerPosition)) {
+        const facing = (
+          teamPlan?.target?.position ?? attackerPosition!
+        ).subtract(root.position);
         root.rotation.y = Math.atan2(-facing.x, -facing.z);
       }
     },

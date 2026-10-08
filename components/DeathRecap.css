@@ -192,3 +192,39 @@
     height: 125px;
   }
 }
+
+.death-recap header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #0a202b;
+  padding-bottom: 4px;
+}
+.recap-close {
+  float: right;
+  margin: 0 0 8px 8px;
+}
+.respawn-overlay:has(.death-recap) {
+  text-transform: none;
+  top: 50%;
+  max-height: 80dvh;
+}
+.respawn-overlay .death-recap .roster-name,
+.respawn-overlay .death-recap span {
+  letter-spacing: normal;
+  line-height: 1.5;
+}
+
+.recap-close {
+  background: #102d3c;
+  color: #dcebf0;
+  border: 1px solid #4a7182;
+  border-radius: 4px;
+  padding: 8px 11px;
+  font: 11px monospace;
+  cursor: pointer;
+}
+.recap-close:focus-visible {
+  outline: 2px solid #35d5ea;
+  outline-offset: 2px;
+}

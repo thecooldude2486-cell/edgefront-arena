@@ -6,15 +6,38 @@ import { WEAPON_DEFINITIONS } from '@/game/weaponDefinitions';
 import { Killcam } from './Killcam';
 import { RarityBadge } from './RarityBadge';
 import './DeathRecap.css';
-export function DeathRecap({ recap }: { recap: Recap }) {
+export function DeathRecap({
+  recap,
+  onClose,
+  onPlaybackComplete,
+  closeLabel = 'Close / Spectate ×',
+}: {
+  recap: Recap;
+  onClose?: () => void;
+  onPlaybackComplete?: () => void;
+  closeLabel?: string;
+}) {
   return (
     <section className="death-recap" aria-label="Death recap">
       <header>
+        {onClose && (
+          <button
+            className="recap-close"
+            onClick={onClose}
+            aria-label="Close death recap"
+          >
+            {closeLabel}
+          </button>
+        )}
         <small>DEATH RECAP</small>
         <h3>Eliminated by {recap.killer}</h3>
       </header>
       {recap.replay && (
-        <Killcam replay={recap.replay} profiles={recap.replayProfiles} />
+        <Killcam
+          replay={recap.replay}
+          profiles={recap.replayProfiles}
+          onComplete={onPlaybackComplete}
+        />
       )}
       <div className="recap-numbers">
         <span>
@@ -113,7 +136,7 @@ export function DeathRecapDialog({
   }, []);
   return (
     <dialog className="death-recap-dialog" ref={ref} onCancel={onClose}>
-      <DeathRecap recap={recap} />
+      <DeathRecap recap={recap} onClose={onClose} closeLabel="Close ×" />
       <button autoFocus className="primary-button" onClick={onClose}>
         Back to game
       </button>

@@ -2,6 +2,7 @@
 
 import { ARENA_MAPS, type ArenaMapId } from '@/game/maps';
 import { mapsForTeams } from '@/game/teams';
+import { MapArtwork } from './MapArtwork';
 import './MapPicker.css';
 export function MapPicker({
   value,
@@ -16,7 +17,9 @@ export function MapPicker({
 }) {
   return (
     <fieldset className="map-picker" disabled={disabled}>
-      <legend>Arena map</legend>
+      <legend>
+        {teamSize}v{teamSize} · Select map · 5 arenas
+      </legend>
       <div>
         {mapsForTeams(teamSize).map((id) => (
           <label
@@ -32,12 +35,7 @@ export function MapPicker({
               checked={value === id}
               onChange={() => onChange(id)}
             />
-            <span className={'map-art ' + id} aria-hidden="true">
-              <i />
-              <i />
-              <i />
-              <i />
-            </span>
+            <MapArtwork id={id} />
             <strong>{ARENA_MAPS[id].name}</strong>
             <small>{ARENA_MAPS[id].difficulty}</small>
           </label>
@@ -51,7 +49,8 @@ export function MapPicker({
       </p>
       <small>
         Map difficulty describes the terrain. Choose Rook’s skill separately.
-        Everyone votes for the map in online rooms.
+        Online matches vote on these five maps; bot training uses your
+        selection.
       </small>
     </fieldset>
   );

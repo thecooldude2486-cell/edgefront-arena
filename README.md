@@ -37,12 +37,13 @@ Open `http://localhost:3000` in a normal desktop web browser. Press `Control + C
 
 ## Maps, recaps and rarity
 
-Choose the map in bot match setup or before creating an online room. The host's map is shared by both players and retained for reconnects and rematches. Public room listings show the map.
+Choose a map directly in bot setup. Online rooms vote on their mode's five-map pool before loadouts; the server shares the result with everyone. Reconnects keep that match's map and rematches open fresh voting. See the full mode catalogue below.
 
 - **Switchyard / Easy:** broad ground routes and generous cover.
 - **Stadium / Normal:** the original central ring and raised side lanes.
 - **Skyline / Hard:** a high skybridge, lower deck and ramped flanks.
 - **Crossfire / Extreme:** exposed sightlines, small cover islands and four firing decks.
+- **Prism Quarry / Normal:** staggered cuts, low cover and paired ramped overlooks.
 
 Terrain difficulty is separate from Rook's five AI difficulties. Client collisions and server hit queries use the same map builder.
 
@@ -200,8 +201,38 @@ After the seven starter claims, every new day offers one **100-Orb daily supply*
 
 Bot training and online rooms offer **1v1, 2v2, 3v3, 4v4 and 5v5**. In bot teams, you play on Cyan alongside allied bots against Coral Rooks. Online rooms use real players and wait for the selected capacity. A team wins a round when the opposing team is fully eliminated; first to five rounds wins. Eliminated players wait while surviving teammates keep fighting. The recorded killcam plays for **three seconds**, and every round intermission lasts **three seconds**.
 
-Map choices match team size: duels use Switchyard, Stadium, Skyline or Crossfire; 2v2/3v3 use the medium Foundry and Relay arenas; 4v4/5v5 use large Harbor and Citadel arenas. Larger maps have spaced team spawns, additional cover and lanes. Moving ferries, high item-access perches, the void and explosive barrels remain available. Bot setup shows your vote and the other bots’ votes. Online players get a ten-second map vote before choosing their loadouts; majority wins, ties choose randomly, and rematches vote again.
+After elimination, **Close / Spectate** dismisses the recap immediately; a completed three-second killcam also dismisses it. The last recap remains available from the recap shortcut. A live shoulder camera follows surviving teammates in bot and online matches. Movement, jumps and aim use frame-rate independent easing; cover pulls the camera inward immediately and releases it gently. Use **Previous / Next** or click an eligible individual roster row to switch; eliminated or disconnected targets are skipped automatically. During the round break, surviving opponents can also be watched (including 1v1). Starting the next round or returning to the lobby restores the player camera. Each participant has a named roster row with HP and elimination status; online rows also show level and individual kills/deaths.
+
+Online **2v2–5v5** rooms let you choose **Auto assign, Cyan or Coral** before creating or joining a room. A full preferred team automatically places you on the other side; the server counts disconnected reservations as occupied. You can switch to an open side in the waiting lobby, with your name, cosmetics, stats and reconnect token preserved. Teams lock when map voting starts. 1v1 still assigns opposing sides automatically, and bot training keeps its existing teams.
+
+Setup screens keep quick actions in a separate header above the scrolling panel. Match quick actions are available through the compact **Menu** dropdown and the existing B/L/K/H shortcuts.
+
+Each mode has five distinct maps (25 total), sized for its player count:
+
+| Mode | Maps |
+| --- | --- |
+| 1v1 | Switchyard, Stadium, Skyline, Crossfire, Prism Quarry |
+| 2v2 | Foundry, Relay Station, Conduit, Freight Depot, Causeway |
+| 3v3 | Junction, Atrium, Reactor, Terraces, Switchback |
+| 4v4 | District, Drydock, Bastion, Reservoir, Gauntlet |
+| 5v5 | Sky Harbor, Citadel, Terminal, Refinery, Nexus |
+
+Bot training always uses the map you select; bots do not vote. Online players get
+one vote each and ten seconds to choose from their mode's five-map pool before
+loadouts. Votes can change while voting remains open. Voting ends when everyone
+votes or time expires. Most votes wins; ties and no-vote rounds choose randomly
+within that pool. The server validates the mode, retains votes during reconnect
+pauses, and starts a fresh vote for a rematch. Moving ferries, item-only perches,
+fall hazards and explosive barrels remain available. New maps use distinct cover
+placements and accessible ramped overlooks with the existing game's visual style.
 
 Online team combat validates every weapon on the server, tests all enemy hitboxes against cover, and applies explosions to nearby enemies. Friendly weapon damage is disabled; oil barrels can hurt anyone. Levels, gear, health and K/D are visible on the team roster. A disconnected seat is held for 30 seconds while the room freezes its round, projectiles and platforms. Rejoining restores position, health and ammunition. Online career awards use each player’s confirmed eliminations and deaths, with the existing ×2 online multiplier and 300/150 XP victory/defeat completion bonuses.
 
 Checks: `node --test server/teams.test.mjs tests/botTeams.test.mjs tests/maps.test.mjs tests/arenaEnvironment.test.mjs`. The team server test connects ten real WebSocket clients and verifies voting, room capacity, nearest-enemy damage, killcam statistics, reconnects and three-second round timing.
+
+Team bot matches use independent assault, flank and anchor roles. Teammates spread
+across separate lanes, navigate around solid cover and voids, and use different
+strafe/reaction timings. Bots prefer visible enemies, share pressure, remember a
+last-seen position briefly, and hold fire when an ally crosses their shot. Wounded
+bots briefly withdraw behind reachable cover before re-peeking. Health and weapon
+damage still follow the existing difficulty rules.

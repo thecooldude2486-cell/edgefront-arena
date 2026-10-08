@@ -34,6 +34,7 @@ jobs:
       - name: Verify website entry file
         run: |
           test -s dist-pages/index.html
+          git rev-parse HEAD > dist-pages/version.txt
           echo "===== INDEX.HTML FILES ====="
           find dist-pages -name index.html -print
       - name: Upload website

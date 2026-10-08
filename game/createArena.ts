@@ -8,6 +8,7 @@ import {
   Vector3,
 } from '@babylonjs/core';
 import { createArenaEnvironment } from './createArenaEnvironment';
+import { CUSTOM_ARENA_LAYOUTS } from './mapLayouts';
 import { mapScale } from './teams';
 import { COLORS } from './config';
 import { DEFAULT_MAP, type ArenaMapId } from './maps';
@@ -422,6 +423,69 @@ export function createArena(scene: Scene, mapId: ArenaMapId = DEFAULT_MAP) {
           true,
           dark,
         );
+    } else if (CUSTOM_ARENA_LAYOUTS[mapId]) {
+      const layout = CUSTOM_ARENA_LAYOUTS[mapId]!;
+      for (const [
+        index,
+        [x, z, width, depth, height, rotation = 0],
+      ] of layout.covers.entries()) {
+        const cover = box(
+          `tactical cover ${index}`,
+          x,
+          height / 2,
+          z,
+          width,
+          height,
+          depth,
+          true,
+          z < 0 ? cyan : z > 0 ? coral : dark,
+        );
+        cover.rotation.y = rotation;
+        const trim = box(
+          `cover trim ${index}`,
+          x,
+          height + 0.04,
+          z,
+          width,
+          0.08,
+          depth,
+          false,
+          lime,
+        );
+        trim.rotation.y = rotation;
+        trim.checkCollisions = false;
+        trim.isPickable = false;
+      }
+      for (const [
+        index,
+        [x, z, width, depth, height],
+      ] of layout.decks.entries()) {
+        box(`raised route ${index}`, x, height - 0.2, z, width, 0.4, depth);
+        const run = height * 3.5;
+        for (const side of [-1, 1] as const) {
+          createRamp(
+            scene,
+            `${mapId} route ramp ${index} ${side}`,
+            new Vector3(x, height / 2 - 0.12, z + side * (depth / 2 + run / 2)),
+            width,
+            run,
+            height,
+            side === -1 ? -1 : 1,
+            floorLight,
+          );
+        }
+        box(
+          `overlook cover ${index}`,
+          x + width / 2 - 0.4,
+          height + 0.5,
+          z,
+          0.8,
+          1,
+          Math.min(3, depth),
+          true,
+          dark,
+        );
+      }
     } else {
       for (const x of [-18, 18])
         for (const z of [-7, 7]) {
@@ -852,6 +916,8 @@ export function createArena(scene: Scene, mapId: ArenaMapId = DEFAULT_MAP) {
             { width: 4, height: 3.6, depth: 3 },
             concrete,
           );
+  }
+  {
     const scale = mapScale(mapId);
     scene.meshes
       .filter((m) => !previousMeshes.has(m) && !m.parent)

@@ -1,0 +1,160 @@
+/* Setup header and scrolling content occupy separate grid rows, even when buttons wrap. */
+.game-header {
+  display: contents;
+}
+.game-quick-menu .quick-menu-items {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.game-shell.setup-view {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100dvh;
+  overflow: hidden;
+}
+.game-shell.setup-view > .game-canvas {
+  position: absolute;
+  inset: 0;
+}
+.game-shell.setup-view > .game-header {
+  grid-row: 1;
+  position: relative;
+  z-index: 46;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px 24px;
+  padding: 16px 24px;
+  border-bottom: 1px solid #315366;
+  background: #071926ed;
+}
+.game-shell.setup-view .brand-mark {
+  position: static;
+  flex-shrink: 0;
+  margin-right: auto;
+}
+.game-shell.setup-view .game-quick-menu {
+  position: static;
+  display: block;
+  max-width: 100%;
+}
+.game-shell.setup-view > .start-screen {
+  position: relative;
+  inset: auto;
+  grid-row: 2;
+  min-width: 0;
+  min-height: 0;
+  padding: 24px;
+  align-items: start;
+}
+.game-shell.setup-view .start-card {
+  box-sizing: border-box;
+  min-width: 0;
+  margin: 0 auto;
+}
+.setup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+.setup-actions .primary-button {
+  min-height: 0;
+  margin: 0;
+  padding: 12px 16px;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  flex: 1 1 170px;
+}
+.game-quick-menu.compact-quick-menu {
+  display: block;
+  max-width: calc(100vw - 32px);
+  left: 16px;
+  top: 56px;
+  bottom: auto;
+}
+.compact-quick-menu summary {
+  list-style: none;
+  padding: 8px 12px;
+  width: max-content;
+  cursor: pointer;
+  border: 1px solid #35d5ea66;
+  border-radius: 5px;
+  background: #0b2332ed;
+  color: #cdeaf2;
+  font: 700 11px monospace;
+}
+.compact-quick-menu summary::-webkit-details-marker {
+  display: none;
+}
+.compact-quick-menu summary::after {
+  content: ' ▾';
+  color: #35d5ea;
+}
+.compact-quick-menu[open] summary::after {
+  content: ' ×';
+}
+.compact-quick-menu .quick-menu-items {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  display: grid;
+  width: min(220px, calc(100vw - 32px));
+  padding: 8px;
+  border: 1px solid #315366;
+  border-radius: 6px;
+  background: #071926;
+  box-shadow: 0 10px 24px #0008;
+}
+.compact-quick-menu summary:focus-visible {
+  outline: 2px solid #35d5ea;
+  outline-offset: 3px;
+}
+.game-shell.online-match .brand-mark {
+  display: none;
+}
+.game-shell.online-match .compact-quick-menu {
+  top: 18px;
+}
+@media (max-width: 700px) {
+  .game-shell.setup-view > .game-header {
+    padding: 12px;
+    gap: 10px;
+  }
+  .game-shell.setup-view > .start-screen {
+    padding: 14px;
+  }
+  .game-shell.setup-view .quick-menu-items {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .game-shell.setup-view .game-quick-menu {
+    width: 100%;
+  }
+  .game-shell.setup-view .quick-menu-items button {
+    padding: 8px;
+    min-width: 0;
+    font-size: 10px;
+  }
+  .game-shell.setup-view .start-card {
+    padding: 20px 16px;
+  }
+  .game-shell.bot-match .brand-mark {
+    display: none;
+  }
+  .game-shell.bot-match .compact-quick-menu,
+  .game-shell.online-match .compact-quick-menu {
+    top: 14px;
+    left: 12px;
+  }
+  .game-shell.bot-match .scoreboard,
+  .game-shell.online-match .online-score {
+    top: 56px;
+  }
+}
+@media (max-height: 500px) and (min-width: 701px) {
+  .game-shell.setup-view > .game-header {
+    padding: 8px 16px;
+  }
+}

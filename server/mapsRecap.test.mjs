@@ -5,6 +5,7 @@ import { createRoomServer } from './index.mjs';
 import { createHitWorld } from './combat.mjs';
 import { readDeathRecap } from '../game/deathRecap.ts';
 import { ARENA_MAPS } from '../game/maps.ts';
+import { mapScale } from '../game/teams.ts';
 const server = process.env.TEST_SERVER_URL
   ? null
   : createRoomServer({ port: 0 });
@@ -59,7 +60,7 @@ try {
         pose: {
           x: 0,
           y: 0.9,
-          z: i ? -12 : -16,
+          z: -17 * mapScale(mapId) + (i ? 4 : 0),
           yaw: i ? Math.PI : 0,
           pitch: 0,
         },
@@ -71,7 +72,7 @@ try {
       weapon: 'sniper',
       action: 'fire',
       sequence: 1,
-      origin: { x: 0, y: 1.52, z: -16 },
+      origin: { x: 0, y: 1.52, z: -17 * mapScale(mapId) },
       direction: { x: 0, y: 0, z: 1 },
     });
     await until(() => latest(b, 'score')?.phase === 'roundOver');
@@ -112,7 +113,7 @@ try {
     }
   }
   console.log(
-    'PASS: four maps through two real WebSocket clients, host-authoritative selection, invalid maps rejected, map-specific server occlusion, shared death recaps, actual HP damage and headshot finish.',
+    'PASS: 25 maps through two real WebSocket clients, host-authoritative selection, invalid maps rejected, map-specific server occlusion, shared death recaps, actual HP damage and headshot finish.',
   );
 } finally {
   sockets.forEach((s) => s.terminate());

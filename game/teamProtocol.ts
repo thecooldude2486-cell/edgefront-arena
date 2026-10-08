@@ -10,6 +10,7 @@ export type TeamPlayer = {
   slot: number;
   name: string;
   connected: boolean;
+  occupied?: boolean;
   ready: boolean;
   health: number;
   pose: PlayerPose | null;

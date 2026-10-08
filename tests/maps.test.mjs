@@ -16,7 +16,8 @@ registerHooks({
 const { NullEngine, Scene, MeshBuilder, Ray, Vector3 } =
   await import('@babylonjs/core');
 const { createArena } = await import('../game/createArena.ts');
-const { ARENA_MAPS, isArenaMapId } = await import('../game/maps.ts');
+const { ARENA_MAPS, MODE_MAPS, isArenaMapId } = await import('../game/maps.ts');
+const { mapScale, teamSpawn } = await import('../game/teams.ts');
 const engine = new NullEngine(),
   scene = new Scene(engine),
   sentinel = MeshBuilder.CreateBox('unrelated weapon', { size: 0.1 }, scene);
@@ -43,26 +44,42 @@ try {
     signatures.push(
       arena.meshes
         .filter((mesh) => mesh.checkCollisions)
-        .map((mesh) => [mesh.name, ...mesh.position.asArray()])
+        .map((mesh) => [
+          ...mesh.position.asArray(),
+          ...mesh.getBoundingInfo().boundingBox.extendSizeWorld.asArray(),
+          ...mesh.rotation.asArray(),
+        ])
         .flat()
         .join(','),
     );
-    for (const z of [-17, 17]) {
+    const size = Number(
+      Object.entries(MODE_MAPS).find(([, maps]) => maps.includes(id))[0],
+    );
+    for (const slot of Array.from({ length: size * 2 }, (_, slot) => slot)) {
+      const { x, z } = teamSpawn(slot, size, id);
       const floor = scene.pickWithRay(
-        new Ray(new Vector3(0, 0.9, z), Vector3.Down(), 2),
+        new Ray(new Vector3(x, 0.9, z), Vector3.Down(), 2),
         (mesh) => mesh.checkCollisions,
       );
       assert.ok(floor.hit, 'Both spawns have a solid floor');
       assert.ok(Math.abs(floor.pickedPoint.y) < 0.1);
       const headSpace = scene.pickWithRay(
-        new Ray(new Vector3(0, 0.1, z), Vector3.Up(), 1.8),
+        new Ray(new Vector3(x, 0.1, z), Vector3.Up(), 1.8),
         (mesh) => mesh.checkCollisions,
       );
-      assert.equal(headSpace.hit, false, 'Both spawns fit a standing player');
+      assert.equal(
+        headSpace.hit,
+        false,
+        `All ${size}v${size} spawns fit a standing player on ${id}`,
+      );
     }
     for (const [x, z] of ARENA_MAPS[id].patrol) {
       const hit = scene.pickWithRay(
-        new Ray(new Vector3(x, 1, z), Vector3.Down(), 3),
+        new Ray(
+          new Vector3(x * mapScale(id), 1, z * mapScale(id)),
+          Vector3.Down(),
+          3,
+        ),
         (mesh) => mesh.checkCollisions,
       );
       assert.ok(hit.hit, 'Patrol destinations have ground');
@@ -92,7 +109,7 @@ try {
   );
   assert.equal(isArenaMapId('unknown'), false);
   console.log(
-    'PASS: eight distinct maps, solid spawns, standing clearance, patrol ground, high bridge, destructible cover, collision differences and safe map replacement/disposal.',
+    'PASS: 25 distinct maps, solid spawns, standing clearance, patrol ground, high bridge, destructible cover, collision differences and safe map replacement/disposal.',
   );
 } finally {
   scene.dispose();

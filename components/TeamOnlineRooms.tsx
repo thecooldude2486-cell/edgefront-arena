@@ -5,11 +5,16 @@ import { readCombatSnapshot } from '@/game/onlineSnapshot';
 import type { TeamRoomState } from '@/game/teamProtocol';
 import { mapsForTeams, teamOf, type TeamSize } from '@/game/teams';
 import { ARENA_MAPS } from '@/game/maps';
+import { MapArtwork } from './MapArtwork';
+import { MatchRoster, SpectatorControls } from './MatchRoster';
+import type { SpectatorState } from '@/game/createSpectator';
+import { TeamPreferencePicker } from './TeamPreferencePicker';
+import type { TeamPreference } from '@/game/teams';
 import { TeamSizePicker } from './TeamSizePicker';
 import { LoadoutSelection, type LoadoutChoices } from './LoadoutSelection';
 import { DeathRecap, DeathRecapDialog } from './DeathRecap';
 import { AimOverlay } from './AimOverlay';
-import { LevelBadge, type ProgressionState } from './Progression';
+import type { ProgressionState } from './Progression';
 import type { CharacterAppearance } from '@/game/storeCatalog';
 import { eliminationXp } from '@/game/combatXp';
 import { WEAPON_DEFINITIONS, type WeaponId } from '@/game/weaponDefinitions';
@@ -27,6 +32,8 @@ export function TeamOnlineRooms({
   onNameChange,
   ammo,
   paused,
+  spectator,
+  onMatchStateChange,
 }: {
   game: OnlineGame | null;
   onBack: () => void;
@@ -43,17 +50,24 @@ export function TeamOnlineRooms({
     weaponId: WeaponId;
   };
   paused: boolean;
+  spectator: SpectatorState | null;
+  onMatchStateChange: (active: boolean) => void;
 }) {
   const [size, setSize] = useState<TeamSize>(1),
     [code, setCode] = useState(''),
     [name, setName] = useState(''),
     [visibility, setVisibility] = useState('private'),
+    [hostTeam, setHostTeam] = useState<TeamPreference>('auto'),
+    [joinTeam, setJoinTeam] = useState<TeamPreference>('auto'),
+    [teamNotice, setTeamNotice] = useState(''),
     [room, setRoom] = useState<TeamRoomState | null>(null),
     [connected, setConnected] = useState(false),
     [error, setError] = useState(''),
     [ping, setPing] = useState<number | null>(null),
     [clock, setClock] = useState(() => Date.now()),
     [recapOpen, setRecapOpen] = useState(false),
+    [dismissedRecap, setDismissedRecap] =
+      useState<TeamRoomState['recap']>(null),
     [hit, setHit] = useState(''),
     [list, setList] = useState<
       { code: string; size: number; players: number; phase: string }[]
@@ -73,6 +87,11 @@ export function TeamOnlineRooms({
     xpDeaths = useRef(0),
     xpFinished = useRef(false),
     onXpRef = useRef(onXp);
+  const inMatch =
+    !!room && ['playing', 'intermission', 'finished'].includes(room.phase);
+  useEffect(() => {
+    onMatchStateChange(inMatch);
+  }, [inMatch, onMatchStateChange]);
   useEffect(() => {
     onXpRef.current = onXp;
   }, [onXp]);
@@ -127,6 +146,10 @@ export function TeamOnlineRooms({
         }
         if (m.type === 'netStats') {
           setPing(m.rttMs);
+          return;
+        }
+        if (m.type === 'teamNotice') {
+          setTeamNotice(m.message);
           return;
         }
         if (m.type === 'teamError') {
@@ -263,6 +286,10 @@ export function TeamOnlineRooms({
           game?.setOnlineEnvironment(next.environment, true);
         } else {
           game?.setPreMatchLocked(true);
+          if (next.phase === 'intermission' || next.phase === 'finished') {
+            game?.receiveTeamRoster(next.players, true);
+            game?.setOnlineHealth(own.health, 100);
+          }
           game?.setOnlineEnvironment(next.environment, false);
         }
       };
@@ -337,6 +364,9 @@ export function TeamOnlineRooms({
           <button onClick={back}>Back to lobby</button>
           <h1>Online team arena</h1>
           <TeamSizePicker value={size} onChange={setSize} />
+          {size > 1 && (
+            <TeamPreferencePicker value={hostTeam} onChange={setHostTeam} />
+          )}
           <label>
             Visibility{' '}
             <select
@@ -350,10 +380,26 @@ export function TeamOnlineRooms({
           <button
             disabled={!connected}
             className="primary-button"
-            onClick={() => send({ type: 'teamCreate', size, visibility })}
+            onClick={() =>
+              send({
+                type: 'teamCreate',
+                size,
+                visibility,
+                team: hostTeam,
+              })
+            }
           >
             Create {size}v{size} room
+            {size > 1 &&
+              hostTeam !== 'auto' &&
+              ` · ${hostTeam === 0 ? 'Cyan' : 'Coral'}`}
           </button>
+          <h2 className="join-room-heading">Join a room</h2>
+          <TeamPreferencePicker
+            value={joinTeam}
+            onChange={setJoinTeam}
+            joining
+          />
           <label>
             Room code{' '}
             <input
@@ -364,7 +410,7 @@ export function TeamOnlineRooms({
           </label>
           <button
             disabled={!connected || code.length !== 6}
-            onClick={() => send({ type: 'teamJoin', code })}
+            onClick={() => send({ type: 'teamJoin', code, team: joinTeam })}
           >
             Join room
           </button>
@@ -378,7 +424,9 @@ export function TeamOnlineRooms({
             <button
               key={r.code}
               disabled={r.phase !== 'waiting' || r.players >= r.size * 2}
-              onClick={() => send({ type: 'teamJoin', code: r.code })}
+              onClick={() =>
+                send({ type: 'teamJoin', code: r.code, team: joinTeam })
+              }
             >
               {r.size}v{r.size} · {r.players}/{r.size * 2} · {r.code}
             </button>
@@ -409,19 +457,59 @@ export function TeamOnlineRooms({
                 ? `Map vote · ${remaining}s`
                 : 'Choose loadout and ready up'}
           </p>
+          {room.size > 1 && (
+            <output className="team-assignment">
+              {teamNotice ||
+                `You are on ${team === 0 ? 'Cyan' : 'Coral'} team.`}
+            </output>
+          )}
           <div className="team-lobby-roster">
-            {[0, 1].map((t) => (
-              <div key={t}>
-                <strong>{t === 0 ? 'CYAN' : 'CORAL'} TEAM</strong>
-                {room.players
-                  .filter((p) => teamOf(p.slot, room.size) === t)
-                  .map((p) => (
+            {[0, 1].map((t) => {
+              const members = room.players.filter(
+                (p) => teamOf(p.slot, room.size) === t,
+              );
+              const occupied = members.filter(
+                (p) => p.occupied ?? p.connected,
+              ).length;
+              return (
+                <section
+                  key={t}
+                  className={t === 0 ? 'cyan-choice' : 'coral-choice'}
+                >
+                  <strong>
+                    {t === 0 ? 'CYAN' : 'CORAL'} TEAM · {occupied}/{room.size}
+                  </strong>
+                  {members.map((p) => (
                     <span key={p.slot}>
-                      {p.connected ? p.name : 'Open slot'} {p.ready ? '✓' : ''}
+                      {p.connected
+                        ? p.name
+                        : p.occupied
+                          ? `${p.name} · Reconnecting`
+                          : 'Open slot'}
+                      {p.slot === room.slot ? ' (You)' : ''}{' '}
+                      {p.ready ? '✓' : ''}
                     </span>
                   ))}
-              </div>
-            ))}
+                  {room.size > 1 && (
+                    <button
+                      disabled={
+                        room.phase !== 'waiting' ||
+                        room.paused ||
+                        team === t ||
+                        occupied >= room.size
+                      }
+                      onClick={() => send({ type: 'teamChoose', team: t })}
+                    >
+                      {team === t
+                        ? 'Your team'
+                        : occupied >= room.size
+                          ? 'Team full'
+                          : `Join ${t === 0 ? 'Cyan' : 'Coral'}`}
+                    </button>
+                  )}
+                </section>
+              );
+            })}
           </div>
           <label>
             Your name{' '}
@@ -435,19 +523,44 @@ export function TeamOnlineRooms({
             Set name
           </button>
           {room.phase === 'voting' && (
-            <div className="map-vote">
-              {mapsForTeams(room.size).map((id) => (
-                <button
-                  key={id}
-                  aria-pressed={room.votes[room.slot] === id}
-                  onClick={() => send({ type: 'teamVote', mapId: id })}
-                >
-                  <strong>{ARENA_MAPS[id].name}</strong>
-                  <small>{ARENA_MAPS[id].description}</small>
-                  <b>{room.votes.filter((v) => v === id).length} votes</b>
-                </button>
-              ))}
-            </div>
+            <section aria-label="Map voting" className="online-map-voting">
+              <output className="map-vote-summary">
+                {room.votes.filter(Boolean).length}/{room.size * 2} votes cast ·{' '}
+                {remaining}s remaining
+              </output>
+              <p>
+                Choose one of five {room.size}v{room.size} arenas. You can
+                change your vote until everyone votes or the timer ends. Most
+                votes wins; ties are random.
+              </p>
+              <div className="map-vote">
+                {mapsForTeams(room.size).map((id) => (
+                  <button
+                    key={id}
+                    aria-pressed={room.votes[room.slot] === id}
+                    disabled={room.paused}
+                    onClick={() => send({ type: 'teamVote', mapId: id })}
+                  >
+                    <MapArtwork id={id} />
+                    <strong>{ARENA_MAPS[id].name}</strong>
+                    <small>
+                      {ARENA_MAPS[id].difficulty} terrain ·{' '}
+                      {ARENA_MAPS[id].description}
+                    </small>
+                    <b>
+                      {room.votes.filter((v) => v === id).length} votes{' '}
+                      {room.votes[room.slot] === id ? '· Your vote' : ''}
+                    </b>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+          {(room.phase === 'loadout' || room.phase === 'countdown') && (
+            <p className="selected-map-result">
+              Selected arena · <strong>{ARENA_MAPS[room.mapId].name}</strong> ·{' '}
+              {room.size}v{room.size}
+            </p>
           )}
           {(room.phase === 'loadout' || room.phase === 'countdown') && game && (
             <LoadoutSelection
@@ -470,7 +583,7 @@ export function TeamOnlineRooms({
     );
   return (
     <div className="online-movement-hud team-match-hud">
-      <AimOverlay scoped={ammo.scoped} />
+      {own.health > 0 && !spectator && <AimOverlay scoped={ammo.scoped} />}
       <section className="online-score">
         <span>
           CYAN <strong>{room.scores[0]}</strong>
@@ -483,19 +596,24 @@ export function TeamOnlineRooms({
           CORAL <strong>{room.scores[1]}</strong>
         </span>
       </section>
-      <div className="team-match-roster">
-        {room.players.map((p) => (
-          <span
-            key={p.slot}
-            className={teamOf(p.slot, room.size) === team ? 'ally' : 'enemy'}
-            style={{ opacity: p.health > 0 ? 1 : 0.4 }}
-          >
-            {p.slot === room.slot ? 'You' : p.name}{' '}
-            <LevelBadge level={p.profile.level} /> · {p.health} HP · {p.kills}/
-            {p.deaths}
-          </span>
-        ))}
-      </div>
+      <MatchRoster
+        players={room.players.map((p) => ({
+          ...p,
+          team: teamOf(p.slot, room.size),
+          level: p.profile.level,
+        }))}
+        localSlot={room.slot}
+        spectator={spectator}
+        onSelect={(slot) => game?.spectatePlayer(slot)}
+      />
+      {spectator && (!room.recap || room.recap === dismissedRecap) && (
+        <SpectatorControls
+          state={spectator}
+          intermission={room.phase !== 'playing'}
+          onCycle={(direction) => game?.cycleSpectator(direction)}
+          onRecap={room.recap ? () => setRecapOpen(true) : undefined}
+        />
+      )}
       <div className="online-actions">
         <span className="online-network-status">
           {connected
@@ -531,11 +649,13 @@ export function TeamOnlineRooms({
           </button>
         ))}
       </nav>
-      <div className="team-local-health">
-        {own.health} HP · {WEAPON_DEFINITIONS[ammo.weaponId].name} · {ammo.ammo}
-        /{ammo.reserveAmmo}
-        {ammo.reloading ? ' · Reloading' : ''}
-      </div>
+      {own.health > 0 && (
+        <div className="team-local-health">
+          {own.health} HP · {WEAPON_DEFINITIONS[ammo.weaponId].name} ·{' '}
+          {ammo.ammo}/{ammo.reserveAmmo}
+          {ammo.reloading ? ' · Reloading' : ''}
+        </div>
+      )}
       {hit && (
         <div className={'hit-marker ' + hit}>
           <i />
@@ -550,7 +670,8 @@ export function TeamOnlineRooms({
           onClose={() => setRecapOpen(false)}
         />
       )}
-      {(own.health === 0 || room.phase !== 'playing') && (
+      {(room.phase !== 'playing' ||
+        (own.health === 0 && room.recap && room.recap !== dismissedRecap)) && (
         <div className="online-round-result">
           <strong>
             {room.phase === 'finished'
@@ -561,7 +682,13 @@ export function TeamOnlineRooms({
                 ? `INTERMISSION · ${remaining}s`
                 : 'Eliminated · Your team is still fighting'}
           </strong>
-          {room.recap && <DeathRecap recap={room.recap} />}{' '}
+          {own.health === 0 && room.recap && room.recap !== dismissedRecap && (
+            <DeathRecap
+              recap={room.recap}
+              onClose={() => setDismissedRecap(room.recap)}
+              onPlaybackComplete={() => setDismissedRecap(room.recap)}
+            />
+          )}{' '}
           {room.phase === 'finished' && (
             <button
               disabled={own.ready}

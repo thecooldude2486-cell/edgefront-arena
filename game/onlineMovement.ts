@@ -12,9 +12,14 @@ export type GrenadeThrow = {
   direction: { x: number; y: number; z: number };
 };
 export type OnlineGame = {
+  spectatePlayer: (slot: number) => void;
+  cycleSpectator: (direction: number) => void;
   setBotTeamSize: (size: import('./teams').TeamSize) => void;
   enterTeamOnline: (slot: number, size: number) => void;
-  receiveTeamRoster: (players: import('./teamProtocol').TeamPlayer[]) => void;
+  receiveTeamRoster: (
+    players: import('./teamProtocol').TeamPlayer[],
+    roundOver?: boolean,
+  ) => void;
   receiveTeamEffect: (slot: number, data: OnlineEffect) => void;
   setOnlineEnvironment: (
     state: import('./arenaEnvironment').EnvironmentState,

@@ -1,6 +1,8 @@
 import type { WeaponId } from './weaponDefinitions';
 
 export type GameHudState = {
+  participants?: import('./createSpectator').MatchParticipant[];
+  spectator?: import('./createSpectator').SpectatorState | null;
   teamIntermission?: boolean;
   teamAlive?: boolean[];
   teamSize?: number;
