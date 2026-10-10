@@ -38,6 +38,24 @@ support. Set `HOST=0.0.0.0`, the host-provided `PORT`, and
 For the Pages build, set `VITE_MULTIPLAYER_URL=wss://YOUR-SERVER-ADDRESS` in the
 build environment and rebuild. This is a public address, not a secret. Without it,
 the live room screen explains that online rooms are not configured; bot mode still
-works. No paid host or live backend has been provisioned by this change.
+works. Adding deployment files does not provision a live backend by itself.
+
+## Enable live rooms with Render
+
+1. Open [Deploy the free Edgefront room server](https://render.com/deploy?repo=https%3A%2F%2Fgithub.com%2Fthecooldude2486-cell%2Fedgefront-arena), sign in to Render, review the service on the **Free** plan and deploy. The repository's `render.yaml` supplies the build/start commands, Node 24, `HOST=0.0.0.0`, the GitHub Pages origin and `/health`. Keep the repository root as the build directory: the server imports shared `game/` files and Babylon from root dependencies. Render supplies `PORT` and HTTPS/WebSocket TLS.
+2. Wait for the service to show **Live**, then copy its actual `https://…onrender.com` address. Open `/health` at that address: it must show `service: edgefront-rooms`, `ready: true` and sizes 1–5. Use the actual address rather than assuming the name is globally available.
+3. Share that address with the coding agent to connect and test the GitHub build. Alternatively, in GitHub go to **Settings → Secrets and variables → Actions → Variables**, add repository variable `VITE_MULTIPLAYER_URL` with the same address changed from `https://` to `wss://`, then open **Actions → Deploy Game to GitHub Pages → Run workflow**. Keep the variable so future builds retain the connection. This is a public URL, not a credential.
+4. Validate the deployed server with Node 24 from the repository root:
+
+   ```bash
+   node server/check-hosted.mjs https://YOUR-ACTUAL-SERVER.onrender.com
+   ```
+
+   This wakes the server, checks readiness, connects using the exact GitHub Pages origin, creates private 1v1 through 5v5 rooms, fills every room with real WebSocket clients, checks host team choice and full-team fallback, verifies overflow rejection and leaves the test rooms. It makes no purchases and does not alter existing matches. An unsuccessful check exits with a failure.
+5. Reload the live game. The online screen should say **Room server connected**, and Create Room should work. Join from another browser or computer to play. If it stays disconnected, confirm the service is Live, `/health` works, `ALLOWED_ORIGINS` is `https://thecooldude2486-cell.github.io` (without `/edgefront-arena/`), and the Pages workflow used the actual `wss://` URL.
+
+The blueprint disables automatic backend deploys so frontend commits do not interrupt active rooms. For server updates, use Render's **Manual Deploy → Deploy latest commit**. Keep one server instance because rooms are held in memory.
+
+Free services sleep after 15 minutes without traffic and can take about a minute to wake. The client's reconnect attempts continue during startup. Sleep, restart and redeploy clear active rooms; this free setup is for hobby/testing use, not an always-on competitive service. See [Render's free-service limits](https://render.com/docs/free) and [WebSocket support](https://render.com/docs/websocket).
 
 Files: `index.mjs` manages connections and rooms; `rooms.test.mjs` tests three clients; `movement.test.mjs` checks two-way movement, validation and room isolation. Movement is client-reported for this prototype, not authoritative anti-cheat.

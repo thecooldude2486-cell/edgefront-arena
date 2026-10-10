@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: edgefront-rooms
+    runtime: node
+    plan: free
+    region: singapore
+    branch: main
+    autoDeployTrigger: "off"
+    buildCommand: npm install --omit=dev --ignore-scripts && npm ci --prefix server --omit=dev
+    startCommand: node server/index.mjs
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 24.14.1
+      - key: HOST
+        value: 0.0.0.0
+      - key: ALLOWED_ORIGINS
+        value: https://thecooldude2486-cell.github.io

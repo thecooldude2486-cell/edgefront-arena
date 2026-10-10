@@ -181,8 +181,20 @@ export function createRoomServer({
           })),
         }),
     );
-  const http = createServer((_req, res) => {
-    res.writeHead(200);
+  const http = createServer((req, res) => {
+    if (req.url?.split('?')[0] === '/health') {
+      res.writeHead(stopping ? 503 : 200, {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store',
+      });
+      res.end(JSON.stringify({
+        service: 'edgefront-rooms',
+        ready: !stopping,
+        teamSizes: [1, 2, 3, 4, 5],
+      }));
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end('Edgefront room server');
   });
   const wss = new WebSocketServer({
