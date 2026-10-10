@@ -45,6 +45,16 @@
   align-self: center;
   text-align: right;
 }
+.split-match-roster .roster-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  gap: 3px;
+}
+.split-match-roster .level-badge {
+  font-size: 8px;
+  padding: 1px 3px;
+  line-height: 1.2;
+}
 .split-match-roster .roster-health {
   grid-column: 1 / -1;
 }
@@ -162,7 +172,7 @@
   .match-roster {
     top: 154px;
     left: 8px;
-    width: 145px;
+    width: min(145px, calc((100vw - 24px) / 2));
     padding: 6px;
     max-height: calc(100dvh - 360px);
   }
@@ -196,7 +206,7 @@
   .match-roster {
     top: 95px;
     max-height: 150px;
-    width: 170px;
+    width: min(170px, calc((100vw - 32px) / 2));
   }
   .spectator-controls {
     bottom: 65px;

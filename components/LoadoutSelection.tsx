@@ -1,7 +1,6 @@
 'use client';
 
 import { RarityBadge } from './RarityBadge';
-('use client');
 import { useEffect, useRef, useState } from 'react';
 import type { OnlineGame } from '@/game/onlineMovement';
 import { WEAPON_DEFINITIONS, type WeaponId } from '@/game/weaponDefinitions';

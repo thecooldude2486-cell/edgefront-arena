@@ -11,6 +11,8 @@ import {
 } from '@babylonjs/core';
 import { COLORS, PISTOL, WEAPON } from './config';
 import { createWeaponAmmo } from './createWeaponAmmo';
+import { getGamePreferences, subscribeGamePreferences } from './gamePreferences';
+import { isGameUiInput } from './gameUiInput';
 import type { WeaponHit, WeaponId, PrimaryWeaponId } from './weaponDefinitions';
 import { WEAPON_DEFINITIONS } from './weaponDefinitions';
 import { populateSniperModel } from './createSniperModel';
@@ -61,11 +63,25 @@ function weaponMaterial(scene: Scene, name: string, hex: string, emissive = 0) {
 export function createShotSound() {
   let context: AudioContext | null = null;
   let laserTone: OscillatorNode | null = null;
+  let master: GainNode | null = null;
+  let unsubscribe: (() => void) | undefined;
 
   function ensureContext() {
-    context ??= new AudioContext();
-    if (context.state === 'suspended') void context.resume();
-    return context;
+    if (getGamePreferences().volume === 0 || typeof AudioContext === 'undefined' ||
+      (typeof document !== 'undefined' && (document.hidden || (typeof document.hasFocus === 'function' && !document.hasFocus())))) return null;
+    try {
+      context ??= new AudioContext();
+      if (!master) {
+        master = context.createGain();
+        master.gain.setValueAtTime(getGamePreferences().volume, context.currentTime);
+        master.connect(context.destination);
+        unsubscribe = subscribeGamePreferences(prefs => {
+          if (master && context) master.gain.setValueAtTime(prefs.volume, context.currentTime);
+        });
+      }
+      if (context.state === 'suspended') void context.resume().catch(() => {});
+      return context;
+    } catch { return null; }
   }
 
   return {
@@ -74,13 +90,15 @@ export function createShotSound() {
       if (!on) { laserTone?.stop(); laserTone = null; return; }
       if (laserTone) return;
       const audio = ensureContext();
+      if (!audio) return;
       laserTone = audio.createOscillator();
       const gain = audio.createGain(); gain.gain.value = .025;
       laserTone.type = 'triangle'; laserTone.frequency.value = 210;
-      laserTone.connect(gain).connect(audio.destination); laserTone.start();
+      laserTone.connect(gain).connect(master!); laserTone.start();
     },
     playSwing() {
       const audio = ensureContext();
+      if (!audio) return;
       const now = audio.currentTime;
       const oscillator = audio.createOscillator();
       const gain = audio.createGain();
@@ -89,7 +107,7 @@ export function createShotSound() {
       oscillator.frequency.exponentialRampToValueAtTime(90, now + .18);
       gain.gain.setValueAtTime(.06, now);
       gain.gain.exponentialRampToValueAtTime(.0001, now + .2);
-      oscillator.connect(gain).connect(audio.destination);
+      oscillator.connect(gain).connect(master!);
       oscillator.start(now); oscillator.stop(now + .21);
     },
     playShot() {
@@ -99,6 +117,7 @@ export function createShotSound() {
       if (typeof document !== 'undefined' &&
         (document.hidden || (typeof document.hasFocus === 'function' && !document.hasFocus()))) return;
       const audio = ensureContext();
+      if (!audio) return;
       const now = audio.currentTime;
       const oscillator = audio.createOscillator();
       const gain = audio.createGain();
@@ -108,12 +127,13 @@ export function createShotSound() {
       gain.gain.setValueAtTime(0.0001, now);
       gain.gain.exponentialRampToValueAtTime(0.11, now + 0.004);
       gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
-      oscillator.connect(gain).connect(audio.destination);
+      oscillator.connect(gain).connect(master!);
       oscillator.start(now);
       oscillator.stop(now + 0.085);
     },
     playReload() {
       const audio = ensureContext();
+      if (!audio) return;
       const now = audio.currentTime;
       for (const [delay, frequency] of [
         [0, 260],
@@ -125,14 +145,15 @@ export function createShotSound() {
         oscillator.frequency.value = frequency;
         gain.gain.setValueAtTime(0.07, now + delay);
         gain.gain.exponentialRampToValueAtTime(0.0001, now + delay + 0.055);
-        oscillator.connect(gain).connect(audio.destination);
+        oscillator.connect(gain).connect(master!);
         oscillator.start(now + delay);
         oscillator.stop(now + delay + 0.06);
       }
     },
     dispose() {
+      unsubscribe?.();
       laserTone?.stop(); laserTone = null;
-      void context?.close();
+      void Promise.resolve(context?.close()).catch(() => {});
     },
   };
 }
@@ -774,6 +795,7 @@ export function createWeapon(
   };
   const onContextMenu = (event: MouseEvent) => event.preventDefault();
   const onKeyDown = (event: KeyboardEvent) => {
+    if (document.pointerLockElement !== canvas && isGameUiInput(event.target)) return;
     if (event.code === 'KeyR') reload();
     if (
       document.pointerLockElement === canvas &&

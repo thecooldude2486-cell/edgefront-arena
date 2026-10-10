@@ -1,7 +1,6 @@
 'use client';
 
 import { RarityBadge } from './RarityBadge';
-('use client');
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import {
   CHARACTER_ITEMS,
@@ -151,7 +150,7 @@ export function CharacterShop({
     [choice, setChoice] = useState<DailyChoice>('wrap'),
     [notice, setNotice] = useState('');
   useEffect(() => {
-    dialog.current?.focus();
+    dialog.current?.showModal();
     const timer = setInterval(() => refreshRef.current(), 30000);
     return () => clearInterval(timer);
   }, []);
@@ -170,17 +169,15 @@ export function CharacterShop({
   const claimed = Math.min(7, state.dailyClaims);
   return (
     <dialog
-      open
       ref={dialog}
       tabIndex={-1}
       className="character-store"
       aria-modal="true"
       aria-labelledby="character-shop-title"
-      onKeyDown={(event) => {
-        if (event.key === 'Escape') {
-          event.stopPropagation();
-          onClose();
-        }
+      onKeyDown={(event) => event.stopPropagation()}
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
       }}
     >
       <div className="character-store-inner">

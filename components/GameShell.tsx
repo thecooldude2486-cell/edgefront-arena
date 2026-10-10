@@ -1,6 +1,19 @@
 'use client';
 import { GameHeader } from './GameHeader';
 import './GameLayout.css';
+import './GamePolish.css';
+import { GamePreferencesDialog } from './GamePreferencesDialog';
+import { GameStatus } from './GameStatus';
+import { MatchSummary } from './MatchSummary';
+import {
+  DEFAULT_GAME_PREFERENCES,
+  GAME_PREFERENCES_KEY,
+  getGamePreferences,
+  updateGamePreferences,
+  resetGamePreferences,
+  refreshGamePreferences,
+  subscribeGamePreferences,
+} from '@/game/gamePreferences';
 import { MatchRoster, SpectatorControls } from './MatchRoster';
 import { TeamSizePicker } from './TeamSizePicker';
 import { TeamOnlineRooms } from './TeamOnlineRooms';
@@ -82,6 +95,33 @@ const initialHud: GameHudState = {
 };
 
 export function GameShell() {
+  const [preferences, setPreferences] = useState({
+    ...DEFAULT_GAME_PREFERENCES,
+    saved: true,
+  });
+  const [guideSection, setGuideSection] = useState<
+    'settings' | 'controls' | null
+  >(null);
+  useEffect(() => {
+    setPreferences(getGamePreferences());
+    const unsubscribe = subscribeGamePreferences(setPreferences);
+    const changed = (event: StorageEvent) => {
+      if (event.key === GAME_PREFERENCES_KEY || event.key === null)
+        refreshGamePreferences();
+    };
+    window.addEventListener('storage', changed);
+    return () => {
+      unsubscribe();
+      window.removeEventListener('storage', changed);
+    };
+  }, []);
+  const openGuide = useCallback((section: 'settings' | 'controls') => {
+    if (document.pointerLockElement) document.exitPointerLock();
+    setShopOpen(false);
+    setCareerOpen(false);
+    setCharacterShopOpen(false);
+    setGuideSection(section);
+  }, []);
   const [characterShopOpen, setCharacterShopOpen] = useState(false);
   const [storeState, setStoreState] = useState(() => createOrbWallet().state);
   const [daily, setDaily] = useState(() => createOrbWallet().dailyStatus());
@@ -167,7 +207,14 @@ export function GameShell() {
   }, []);
   useEffect(() => {
     function shortcut(event: KeyboardEvent) {
+      if (!gameRef.current) return;
       if (event.repeat || event.altKey || event.ctrlKey || event.metaKey)
+        return;
+      if (
+        document.querySelector(
+          'dialog[open], [role="dialog"][aria-modal="true"]',
+        )
+      )
         return;
       const target = event.target;
       if (
@@ -180,6 +227,8 @@ export function GameShell() {
         KeyL: openCareer,
         KeyK: openCosmetics,
         KeyH: openCharacterShop,
+        F1: () => openGuide('controls'),
+        F2: () => openGuide('settings'),
       };
       const action = actions[event.code];
       if (action) {
@@ -189,7 +238,7 @@ export function GameShell() {
     }
     window.addEventListener('keydown', shortcut, true);
     return () => window.removeEventListener('keydown', shortcut, true);
-  }, [openArmory, openCareer, openCosmetics, openCharacterShop]);
+  }, [openArmory, openCareer, openCosmetics, openCharacterShop, openGuide]);
   const [teamSize, setTeamSize] = useState<TeamSize>(1);
   const teamSizeRef = useRef<TeamSize>(1);
   const [mapId, setMapId] = useState<ArenaMapId>(DEFAULT_MAP);
@@ -563,7 +612,7 @@ export function GameShell() {
 
   return (
     <main
-      className={`game-shell ${started ? 'bot-match' : ''} ${onlineOpen && onlineInMatch ? 'online-match' : ''} ${!started && !selecting && (setupOpen || onlineOpen) && !(onlineOpen && onlineInMatch) ? 'setup-view' : ''}`}
+      className={`game-shell ${preferences.reducedMotion ? 'reduced-motion' : ''} ${started ? 'bot-match' : ''} ${onlineOpen && onlineInMatch ? 'online-match' : ''} ${!started && !selecting && (setupOpen || onlineOpen) && !(onlineOpen && onlineInMatch) ? 'setup-view' : ''}`}
     >
       <canvas
         ref={canvasRef}
@@ -578,7 +627,26 @@ export function GameShell() {
         onLevels={openCareer}
         onCosmetics={openCosmetics}
         onCharacter={openCharacterShop}
+        onControls={() => openGuide('controls')}
+        onSettings={() => openGuide('settings')}
       />
+      {status !== 'ready' && (
+        <GameStatus
+          status={status}
+          error={error}
+          onReload={() => window.location.reload()}
+        />
+      )}
+      {guideSection && (
+        <GamePreferencesDialog
+          preferences={preferences}
+          initialSection={guideSection}
+          onChange={updateGamePreferences}
+          onReset={resetGamePreferences}
+          onClose={() => setGuideSection(null)}
+          online={onlineInMatch}
+        />
+      )}
       {!selecting && !setupOpen && !onlineOpen && (
         <div className={`career-dock ${started ? 'match' : 'lobby'}`}>
           {!started && (
@@ -678,12 +746,12 @@ export function GameShell() {
                   : p,
               )}
               localSlot={0}
-              team={teamSize > 1 ? 0 : undefined}
+              team={0}
               spectator={hud.spectator}
               onSelect={(slot) => gameRef.current?.spectatePlayer(slot)}
             />
           )}
-          {teamSize > 1 && hud.participants && (
+          {hud.participants && (
             <MatchRoster
               players={hud.participants}
               localSlot={0}
@@ -873,7 +941,7 @@ export function GameShell() {
             </div>
             <div className="health-caption">HP / {hud.maxHealth}</div>
           </div>
-          {teamSize === 1 && (
+          {teamSize === 1 && !hud.participants && (
             <div className="health-panel bot-health-panel">
               <div className="health-heading">
                 <span>Rook · {DIFFICULTIES[difficulty].label}</span>
@@ -942,63 +1010,54 @@ export function GameShell() {
             !hud.awaitingFirstInput &&
             hud.result === 'none' &&
             !hud.dead && (
-              <section className="pause-screen" aria-labelledby="pause-title">
+              <section
+                className="pause-screen polished-pause"
+                aria-labelledby="pause-title"
+              >
                 <p>Match paused</p>
-                <button
-                  className="primary-button shop-open-button"
-                  onClick={returnToLobby}
-                >
-                  Return to lobby
-                </button>
-                <h2 id="pause-title">Cursor released</h2>
-                <button
-                  className="primary-button shop-open-button"
-                  type="button"
-                  onClick={() => setShopOpen(true)}
-                >
-                  Weapon shop
-                </button>
-                <button
-                  className="primary-button"
-                  type="button"
-                  onClick={() => gameRef.current?.requestPointerLock()}
-                >
-                  Resume
-                </button>
+                <h2 id="pause-title">Ready when you are</h2>
+                <span>
+                  Your cursor is released. Click Resume to get back in.
+                </span>
+                <div className="pause-actions">
+                  <button
+                    className="polish-button emphasized"
+                    onClick={() => gameRef.current?.requestPointerLock()}
+                  >
+                    Resume
+                  </button>
+                  <button
+                    className="polish-button"
+                    onClick={() => openGuide('settings')}
+                  >
+                    Settings
+                  </button>
+                  <button className="polish-button" onClick={openArmory}>
+                    Armory
+                  </button>
+                  <button className="polish-button" onClick={returnToLobby}>
+                    Return to lobby
+                  </button>
+                </div>
               </section>
             )}
-          {hud.result !== 'none' && (
-            <section
-              className={`match-result ${hud.result}`}
-              aria-labelledby="match-result-title"
-            >
-              <p>Match complete</p>
-              <button
-                className="primary-button shop-open-button"
-                onClick={returnToLobby}
-              >
-                Return to lobby
-              </button>
-              <h2 id="match-result-title">
-                {hud.result === 'victory' ? 'Victory' : 'Defeat'}
-              </h2>
-              {hud.deathRecap && (
-                <button
-                  className="primary-button shop-open-button"
-                  onClick={() => setRecapOpen(true)}
-                >
-                  View death recap
-                </button>
-              )}
-              <button
-                className="primary-button"
-                type="button"
-                onClick={playAgain}
-              >
-                Play again
-              </button>
-            </section>
-          )}
+          {hud.result !== 'none' &&
+            (!hud.dead ||
+              !hud.deathRecap ||
+              hud.deathRecap === dismissedRecap) && (
+              <MatchSummary
+                result={hud.result}
+                scores={[hud.playerScore, hud.botScore]}
+                sides={[
+                  teamSize === 1 ? playerName || 'Player1' : 'Cyan team',
+                  teamSize === 1 ? 'Rook' : 'Coral team',
+                ]}
+                detail={`${teamSize}v${teamSize} · ${ARENA_MAPS[mapId].name} · ${DIFFICULTIES[difficulty].label}`}
+                onReplay={playAgain}
+                onLobby={returnToLobby}
+                onRecap={hud.deathRecap ? () => setRecapOpen(true) : undefined}
+              />
+            )}
         </div>
       )}
 
@@ -1128,6 +1187,7 @@ export function GameShell() {
           onMatchStateChange={setOnlineInMatch}
           ammo={hud}
           onNameChange={setPlayerName}
+          onOpenCareer={openCareer}
           onBack={() => {
             setOnlineOpen(false);
             setSetupOpen(true);
@@ -1229,82 +1289,93 @@ export function GameShell() {
                 match-win bonus
               </small>
             </fieldset>
-            <div className="controls-row" aria-label="Controls">
-              <span className="control-chip">
-                <kbd>Lobby: E</kbd> Open a nearby Armory or Duel deck terminal
-              </span>
-              <span className="control-chip">
-                <kbd>Helion: Hold click</kbd> Beam drains energy · Release to
-                recharge · Requires 5 parts
-              </span>
-              <span className="control-chip">
-                <kbd>WASD</kbd> Move
-              </span>
-              <span className="control-chip">
-                <kbd>Mouse</kbd> Look around
-              </span>
-              <span className="control-chip">
-                <kbd>Click</kbd> Fire / Melee · Hold for AR
-              </span>
-              <span className="control-chip">
-                <kbd>Q Toggle / Right click</kbd> Aim guns
-              </span>
-              <span className="control-chip">
-                <kbd>Grenade: 4 + Click</kbd> 2s fuse · 34 damage · 4m blast ·
-                One per life · No self-damage
-              </span>
-              <span className="control-chip">
-                <kbd>4 · Click</kbd> Throw chosen utility · Molotov burns for 5
-                seconds · No self-damage
-              </span>
-              <span className="control-chip">
-                <kbd>Blast jump</kbd> Explode a grenade or rocket near your feet
-                · WASD steers in air · No self-damage
-              </span>
-              <span className="control-chip">
-                <kbd>Sword: E</kbd> Speed boost 5s · Then cooldown 5s
-              </span>
-              <span className="control-chip grapple-control">
-                <kbd>Orbiter: Hold E / Right click</kbd> Aim at solid cover ·
-                Pull and cling · Release to drop
-              </span>
-              <span className="control-chip">
-                <kbd>R</kbd> Reload
-              </span>
-              <span className="control-chip">
-                <kbd>1 / 2 / 3 / 4</kbd> Primary / Secondary / Melee / Grenade
-              </span>
-              <span className="control-chip">
-                <kbd>Double-tap W</kbd> Sprint
-              </span>
-              <span className="control-chip">
-                <kbd>C / Ctrl Toggle</kbd> Crouch
-              </span>
-              <span className="control-chip">
-                <kbd>Hold Shift</kbd> Slide from standing or moving · No
-                cooldown
-              </span>
-              <span className="control-chip">
-                <kbd>Space</kbd> Jump
-              </span>
-              <span className="control-chip">
-                <kbd>Esc</kbd> Release cursor
-              </span>
+            <details className="setup-controls">
+              <summary>Controls & movement guide</summary>
+              <div className="controls-row" aria-label="Controls">
+                <span className="control-chip">
+                  <kbd>Lobby: E</kbd> Open a nearby Armory or Duel deck terminal
+                </span>
+                <span className="control-chip">
+                  <kbd>Helion: Hold click</kbd> Beam drains energy · Release to
+                  recharge · Requires 5 parts
+                </span>
+                <span className="control-chip">
+                  <kbd>WASD</kbd> Move
+                </span>
+                <span className="control-chip">
+                  <kbd>Mouse</kbd> Look around
+                </span>
+                <span className="control-chip">
+                  <kbd>Click</kbd> Fire / Melee · Hold for AR
+                </span>
+                <span className="control-chip">
+                  <kbd>Q Toggle / Right click</kbd> Aim guns
+                </span>
+                <span className="control-chip">
+                  <kbd>Grenade: 4 + Click</kbd> 2s fuse · 34 damage · 4m blast ·
+                  One per life · No self-damage
+                </span>
+                <span className="control-chip">
+                  <kbd>4 · Click</kbd> Throw chosen utility · Molotov burns for
+                  5 seconds · No self-damage
+                </span>
+                <span className="control-chip">
+                  <kbd>Blast jump</kbd> Explode a grenade or rocket near your
+                  feet · WASD steers in air · No self-damage
+                </span>
+                <span className="control-chip">
+                  <kbd>Sword: E</kbd> Speed boost 5s · Then cooldown 5s
+                </span>
+                <span className="control-chip grapple-control">
+                  <kbd>Orbiter: Hold E / Right click</kbd> Aim at solid cover ·
+                  Pull and cling · Release to drop
+                </span>
+                <span className="control-chip">
+                  <kbd>R</kbd> Reload
+                </span>
+                <span className="control-chip">
+                  <kbd>1 / 2 / 3 / 4</kbd> Primary / Secondary / Melee / Utility
+                </span>
+                <span className="control-chip">
+                  <kbd>Double-tap W</kbd> Sprint
+                </span>
+                <span className="control-chip">
+                  <kbd>C / Ctrl Toggle</kbd> Crouch
+                </span>
+                <span className="control-chip">
+                  <kbd>Hold Shift</kbd> Slide from standing or moving · No
+                  cooldown
+                </span>
+                <span className="control-chip">
+                  <kbd>Space</kbd> Jump
+                </span>
+                <span className="control-chip">
+                  <kbd>Esc</kbd> Release cursor
+                </span>
+              </div>
+            </details>
+            <div className="setup-launch">
+              <p>
+                {teamSize}v{teamSize} · {ARENA_MAPS[mapId].name} ·{' '}
+                {DIFFICULTIES[difficulty].label}
+              </p>
+              <button
+                className="primary-button"
+                type="button"
+                onClick={
+                  status === 'error'
+                    ? () => window.location.reload()
+                    : enterArena
+                }
+                disabled={status === 'loading'}
+              >
+                {status === 'loading'
+                  ? 'Preparing arena…'
+                  : status === 'error'
+                    ? 'Reload game'
+                    : 'Choose name & loadout'}
+              </button>
             </div>
-            <button
-              className="primary-button"
-              type="button"
-              onClick={
-                status === 'error' ? () => window.location.reload() : enterArena
-              }
-              disabled={status === 'loading'}
-            >
-              {status === 'loading'
-                ? 'Preparing arena…'
-                : status === 'error'
-                  ? 'Reload game'
-                  : 'Enter arena'}
-            </button>
             {status === 'loading' && (
               <p className="loading-line">Calibrating the arena renderer…</p>
             )}

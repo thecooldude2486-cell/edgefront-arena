@@ -4,6 +4,19 @@ Edgefront Arena is a small, original 1v1 browser FPS prototype. You fight one si
 
 ## Run the game
 
+### Controls and settings
+
+Use **F1** for the controls guide and **F2** for settings, or open them from the
+quick menu. Mouse sensitivity, sound volume, graphics resolution and reduced UI
+motion apply immediately and are saved in this browser. Performance mode renders
+at a lower resolution; Balanced caps retina rendering at 1.5×, and High at 2×.
+Settings continue to work for the session if browser saving is blocked. Online
+matches keep running while menus are open. Press **Esc** to close a dialog, then
+use **Resume** to capture the cursor again.
+
+Both bot and online matches show each team's individual players. Finished
+matches show final scores and replay/lobby actions after the last death recap.
+
 On this Mac, double-click **Start Edgefront Arena.command** in the project folder.
 It starts the game on http://localhost:3000/ and online rooms on port 3008.
 Keep its Terminal window open while playing. Localhost requires these servers

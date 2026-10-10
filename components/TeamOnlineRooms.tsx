@@ -14,6 +14,9 @@ import { TeamSizePicker } from './TeamSizePicker';
 import { LoadoutSelection, type LoadoutChoices } from './LoadoutSelection';
 import { DeathRecap, DeathRecapDialog } from './DeathRecap';
 import { AimOverlay } from './AimOverlay';
+import { MatchSummary } from './MatchSummary';
+import { OnlineAvailability, type OnlineStatus } from './OnlineAvailability';
+import { ProgressionBar } from './Progression';
 import type { ProgressionState } from './Progression';
 import type { CharacterAppearance } from '@/game/storeCatalog';
 import { eliminationXp } from '@/game/combatXp';
@@ -30,6 +33,7 @@ export function TeamOnlineRooms({
   character,
   onXp,
   onNameChange,
+  onOpenCareer,
   ammo,
   paused,
   spectator,
@@ -42,6 +46,7 @@ export function TeamOnlineRooms({
   character: CharacterAppearance;
   onXp: (n: number, bonuses?: string[]) => void;
   onNameChange: (name: string) => void;
+  onOpenCareer?: () => void;
   ammo: {
     ammo: number;
     reserveAmmo: number;
@@ -62,6 +67,7 @@ export function TeamOnlineRooms({
     [teamNotice, setTeamNotice] = useState(''),
     [room, setRoom] = useState<TeamRoomState | null>(null),
     [connected, setConnected] = useState(false),
+    [networkStatus, setNetworkStatus] = useState<OnlineStatus>('connecting'),
     [error, setError] = useState(''),
     [ping, setPing] = useState<number | null>(null),
     [clock, setClock] = useState(() => Date.now()),
@@ -115,18 +121,34 @@ export function TeamOnlineRooms({
         (local ? 'ws://localhost:3008' : '');
     if (!url) {
       queueMicrotask(() => {
-        if (!stopped) setError('Online room server is not configured.');
+        if (!stopped) {
+          setNetworkStatus('unavailable');
+          setError(
+            'This build has no online room service connected. Bot training, cosmetics and career rewards are ready to play.',
+          );
+        }
       });
       return;
     }
     function connect() {
       if (stopped) return;
-      const ws = new WebSocket(url);
+      let ws: WebSocket;
+      try {
+        ws = new WebSocket(url);
+      } catch {
+        setNetworkStatus('unavailable');
+        setError(
+          'The online service address could not be opened. You can play bot training.',
+        );
+        return;
+      }
       socket.current = ws;
       ws.onopen = () => {
         attempt = 0;
         disconnectedAt = 0;
         setConnected(true);
+        setNetworkStatus('connected');
+        setError('');
         lastReceived = Date.now();
         ws.send(JSON.stringify({ type: 'enableResume' }));
         if (token.current)
@@ -296,13 +318,17 @@ export function TeamOnlineRooms({
       ws.onclose = () => {
         if (stopped) return;
         setConnected(false);
+        setNetworkStatus('reconnecting');
         setPing(null);
         needsResume.current = true;
         game?.setOnlineNetworkPaused(true);
         if (!disconnectedAt) disconnectedAt = Date.now();
         if (Date.now() - disconnectedAt < 30000)
           retry = setTimeout(connect, Math.min(3000, 500 * 2 ** attempt++));
-        else setError('Reconnect timed out. Leave and join a room again.');
+        else {
+          setNetworkStatus('unavailable');
+          setError('Reconnect timed out. Leave and join a room again.');
+        }
       };
       ws.onerror = () => ws.close();
     }
@@ -431,10 +457,14 @@ export function TeamOnlineRooms({
               {r.size}v{r.size} · {r.players}/{r.size * 2} · {r.code}
             </button>
           ))}
-          {error && <p role="alert">{error}</p>}
-          <small>
-            {connected ? 'Connected' : 'Connecting to room server…'}
-          </small>
+          {error && networkStatus !== 'unavailable' && (
+            <p role="alert">{error}</p>
+          )}
+          <OnlineAvailability
+            status={networkStatus}
+            error={error}
+            onBots={back}
+          />
         </div>
       </section>
     );
@@ -596,6 +626,11 @@ export function TeamOnlineRooms({
           CORAL <strong>{room.scores[1]}</strong>
         </span>
       </section>
+      {onOpenCareer && (
+        <div className="career-dock match online-career">
+          <ProgressionBar state={career} onOpen={onOpenCareer} compact />
+        </div>
+      )}
       <MatchRoster
         players={room.players.map((p) => ({
           ...p,
@@ -603,6 +638,19 @@ export function TeamOnlineRooms({
           level: p.profile.level,
         }))}
         localSlot={room.slot}
+        team={team as 0 | 1}
+        spectator={spectator}
+        onSelect={(slot) => game?.spectatePlayer(slot)}
+      />
+      <MatchRoster
+        players={room.players.map((p) => ({
+          ...p,
+          team: teamOf(p.slot, room.size),
+          level: p.profile.level,
+        }))}
+        localSlot={room.slot}
+        team={(1 - team) as 0 | 1}
+        opposing
         spectator={spectator}
         onSelect={(slot) => game?.spectatePlayer(slot)}
       />
@@ -615,7 +663,23 @@ export function TeamOnlineRooms({
         />
       )}
       <div className="online-actions">
-        <span className="online-network-status">
+        <span
+          className="online-network-status"
+          data-quality={
+            !connected || (ping !== null && ping >= 160)
+              ? 'poor'
+              : ping !== null && ping >= 80
+                ? 'fair'
+                : 'good'
+          }
+          aria-label={
+            connected
+              ? ping === null
+                ? 'Connected to room server'
+                : `Network latency: ${ping} milliseconds`
+              : 'Reconnecting to room server'
+          }
+        >
           {connected
             ? ping === null
               ? 'Connected'
@@ -670,7 +734,25 @@ export function TeamOnlineRooms({
           onClose={() => setRecapOpen(false)}
         />
       )}
-      {(room.phase !== 'playing' ||
+      {room.phase === 'finished' &&
+        (own.health > 0 || !room.recap || room.recap === dismissedRecap) && (
+          <MatchSummary
+            result={room.winner === team ? 'victory' : 'defeat'}
+            scores={[room.scores[team], room.scores[1 - team]]}
+            sides={[
+              team === 0 ? 'Cyan team' : 'Coral team',
+              team === 0 ? 'Coral team' : 'Cyan team',
+            ]}
+            team={team}
+            detail={`${room.size}v${room.size} · ${ARENA_MAPS[room.mapId].name} · ${own.kills}K / ${own.deaths}D`}
+            onReplay={() => send({ type: 'teamRematch' })}
+            onLobby={back}
+            onRecap={room.recap ? () => setRecapOpen(true) : undefined}
+            replayLabel="Rematch & vote"
+            waiting={own.ready}
+          />
+        )}
+      {(room.phase === 'intermission' ||
         (own.health === 0 && room.recap && room.recap !== dismissedRecap)) && (
         <div className="online-round-result">
           <strong>
@@ -688,14 +770,6 @@ export function TeamOnlineRooms({
               onClose={() => setDismissedRecap(room.recap)}
               onPlaybackComplete={() => setDismissedRecap(room.recap)}
             />
-          )}{' '}
-          {room.phase === 'finished' && (
-            <button
-              disabled={own.ready}
-              onClick={() => send({ type: 'teamRematch' })}
-            >
-              {own.ready ? 'Waiting for everyone' : 'Rematch & vote'}
-            </button>
           )}
         </div>
       )}

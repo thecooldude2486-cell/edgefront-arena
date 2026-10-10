@@ -1,4 +1,6 @@
 import { createSpectator, type SpectatorActor } from './createSpectator';
+import { getGamePreferences, subscribeGamePreferences, applyViewPreferences } from './gamePreferences';
+import { isGameUiInput } from './gameUiInput';
 import {teamSpawn,teamOf,mapScale,type TeamSize} from './teams';
 import {createReplayBuffer} from './killReplay';
 import {FALL_DEATH_Y,barrelDamage,type EnvironmentState} from './arenaEnvironment';
@@ -117,6 +119,9 @@ export function createGame(
   camera.fov = 1.05;
   // Lower sensitivity numbers turn the camera farther for the same mouse move.
   camera.angularSensibility = PLAYER.lookSensitivity;
+  const applyPreferences = () => applyViewPreferences(camera, engine, getGamePreferences(), window.devicePixelRatio, PLAYER.lookSensitivity);
+  applyPreferences();
+  const unsubscribePreferences = subscribeGamePreferences(applyPreferences);
   camera.inertia = PLAYER.lookInertia;
   camera.checkCollisions = false;
   camera.applyGravity = false;
@@ -685,6 +690,7 @@ export function createGame(
 
   const onKeyDown = (event: KeyboardEvent) => {
     if (preMatchLocked || networkPaused) return;
+    if (document.pointerLockElement !== canvas && isGameUiInput(event.target)) return;
     if (inLobby && event.code === 'KeyE') {
       if (!event.repeat && document.pointerLockElement === canvas) interactLobby();
       event.preventDefault();
@@ -1002,7 +1008,7 @@ export function createGame(
   }
   enterLobby();
   engine.runRenderLoop(() => scene.render());
-  const onResize = () => engine.resize();
+  const onResize = () => { applyPreferences(); engine.resize(); };
   window.addEventListener('resize', onResize);
 
   return {
@@ -1170,6 +1176,7 @@ export function createGame(
       botEntry.start();
     },
     dispose: () => {
+      unsubscribePreferences();
       spectator.dispose();
       teamUnits.forEach(u=>u.bot.dispose());teamRemotes.forEach(r=>r.dispose());
       remotePlayer.dispose(); characterHands.dispose();

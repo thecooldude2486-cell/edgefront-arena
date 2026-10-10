@@ -62,7 +62,7 @@ export function CosmeticPreview({ weapon, cosmetics }: { weapon: WeaponId; cosme
 export function ProgressionPanel({ state, onEquip, onClose, initialSection = 'cosmetics', onOpenArmory }: { state: ProgressionState; onEquip: (kind: CosmeticKind, level: number | null) => void; onClose: () => void; initialSection?: 'levels' | 'cosmetics'; onOpenArmory?: () => void }) {
   const [section, setSection] = useState(initialSection);
   const dialogRef = useRef<HTMLDialogElement>(null);
-  useEffect(() => { dialogRef.current?.focus(); }, []);
+  useEffect(() => { dialogRef.current?.showModal(); }, []);
   const [page, setPage] = useState(Math.floor(Math.max(0, state.level - 1) / 12));
   const [filter, setFilter] = useState<'all' | CosmeticKind>('all');
   const [preview, setPreview] = useState<number | null>(null);
@@ -70,10 +70,10 @@ export function ProgressionPanel({ state, onEquip, onClose, initialSection = 'co
   const hovered = preview === null ? null : rewardAt(preview);
   const previewCosmetics = hovered ? { ...state.cosmetics, [hovered.kind]: hovered.level } : state.cosmetics;
   const rewards = Array.from({ length: 12 }, (_, i) => rewardAt(page * 12 + i + 1)).filter(reward => reward && (filter === 'all' || reward.kind === filter));
-  return <dialog open ref={dialogRef} tabIndex={-1} className="progression-overlay" aria-modal="true" aria-labelledby="career-title" onKeyDown={event => { if (event.key === 'Escape') onClose(); }}>
+  return <dialog ref={dialogRef} tabIndex={-1} className="progression-overlay" aria-modal="true" aria-labelledby="career-title" onCancel={event => { event.preventDefault(); onClose(); }} onKeyDown={event => event.stopPropagation()}>
     <div className="progression-card"><div className="career-heading"><div><p>EDGEFRONT / ARMORY COLLECTION</p><h2 id="career-title">{section === 'levels' ? 'Career levels' : 'Career arsenal'}</h2></div><button onClick={onClose} aria-label="Close level rewards">✕</button></div>
     <nav className="career-section-nav" aria-label="Career shortcuts"><button aria-pressed={section === 'levels'} onClick={() => setSection('levels')}>Levels</button><button aria-pressed={section === 'cosmetics'} onClick={() => { setPreview(null); setSection('cosmetics'); }}>Cosmetics</button>{onOpenArmory && <button onClick={onOpenArmory}>Open Armory ↗</button>}</nav>
-    {section === 'levels' && <div className="career-level-overview"><div><small>CURRENT RANK</small><strong>Level {state.level.toLocaleString()}</strong><p>{(state.required - state.earned).toLocaleString()} XP to your next level</p></div><div><small>EVERY LEVEL</small><strong>15 Orbs + new gear</strong><p>Cosmetics unlock from level 2. Signature rewards every fifth level.</p></div><div><small>ONE CAREER / BOTH MODES</small><strong>Keep climbing</strong><p>Bot matches and online 1v1 earn permanent XP. The reward track keeps going.</p></div></div>}
+    {section === 'levels' && <div className="career-level-overview"><div><small>CURRENT RANK</small><strong>Level {state.level.toLocaleString()}</strong><p>{(state.required - state.earned).toLocaleString()} XP to your next level</p></div><div><small>EVERY LEVEL</small><strong>15 Orbs + new gear</strong><p>Cosmetics unlock from level 2. Signature rewards every fifth level.</p></div><div><small>ONE CAREER / BOTH MODES</small><strong>Keep climbing</strong><p>Bot and online matches earn permanent XP. The reward track keeps going.</p></div></div>}
     <ProgressionBar state={state} onOpen={() => setPage(Math.floor(Math.max(0, state.level - 1) / 12))} />
     {section === 'cosmetics' && <div className="career-workbench">
       <div><label className="career-weapon-label" htmlFor="career-preview-weapon">Inspect weapon</label><select id="career-preview-weapon" value={weapon} onChange={event => setWeapon(event.target.value as WeaponId)}>{(Object.keys(WEAPON_DEFINITIONS) as WeaponId[]).map(id => <option key={id} value={id}>{WEAPON_DEFINITIONS[id].name}</option>)}</select><CosmeticPreview weapon={weapon} cosmetics={previewCosmetics} />
@@ -81,7 +81,7 @@ export function ProgressionPanel({ state, onEquip, onClose, initialSection = 'co
       <div className="career-equipped">{(['skin','wrap','charm'] as const).map(kind => <div key={kind}><small>{kind.toUpperCase()} / EQUIPPED</small><strong>{state.cosmetics[kind] === null ? 'Standard issue' : rewardAt(state.cosmetics[kind]!)?.name}</strong>{state.cosmetics[kind]!==null && <RarityBadge rarity={rewardAt(state.cosmetics[kind]!)!.rarity} />}<button disabled={state.cosmetics[kind] === null} onClick={() => { onEquip(kind, null); setPreview(null); }}>Reset {kind}</button></div>)}</div>
     </div>}
     <p className="career-xp-guide">Elimination XP rewards damage dealt and remaining health. Earn extra XP for headshot finishes, kills from 24m+, precision, quick kills, clutch survival and airborne bot kills. Harder bot modes multiply XP.</p>
-    <p>15 Orbs every level. A new cosmetic every level from LV 2, with signature gear every fifth level. Levels and rewards keep going in bot matches and online 1v1.</p>
+    <p>15 Orbs every level. A new cosmetic every level from LV 2, with signature gear every fifth level. Levels and rewards keep going in bot and online matches.</p>
     <div className="career-toolbar"><nav aria-label="Cosmetic types">{(['all','skin','wrap','charm'] as const).map(kind => <button key={kind} aria-pressed={filter === kind} onClick={() => setFilter(kind)}>{kind === 'all' ? 'All gear' : kind + 's'}</button>)}</nav><div className="career-pagination"><button disabled={page === 0} onClick={() => setPage(page - 1)} aria-label="Previous reward levels">←</button><span>LV {page * 12 + 1}–{(page + 1) * 12}</span><button onClick={() => setPage(page + 1)} aria-label="Next reward levels">→</button></div></div>
     <div className="career-rewards">{rewards.map(reward => {
       if (!reward) return null;
