@@ -38,11 +38,22 @@ configuration differ from the server preview.
 
 ## Online room server
 
-Host `server/` on a service that supports long-running Node 24 processes and secure
-WebSockets. In repository Settings → Secrets and variables → Actions → Variables,
-set `VITE_MULTIPLAYER_URL` to its public `wss://` address. The Pages workflow passes
-that variable to the frontend build. On the room server, allow
-`https://thecooldude2486-cell.github.io` in `ALLOWED_ORIGINS`.
+The Pages workflow connects the published game to
+`wss://edgefront-rooms.onrender.com`. The Render service runs the room server;
+GitHub Pages serves the frontend. The checked-in workflow keeps this connection
+on future deployments without requiring a repository variable.
 
-GitHub Pages only hosts the frontend; it cannot run the room server. Without the
-variable, bot matches work and online rooms display a configuration message.
+To change servers, set repository variable `VITE_MULTIPLAYER_URL` in
+**Settings → Secrets and variables → Actions → Variables** to the new public
+`wss://` address and rerun the Pages workflow. That variable overrides the default.
+On the room server, allow `https://thecooldude2486-cell.github.io` in
+`ALLOWED_ORIGINS`. Validate the server with:
+
+```bash
+node server/check-hosted.mjs https://edgefront-rooms.onrender.com
+```
+
+For local frontend builds, set `VITE_MULTIPLAYER_URL` explicitly when using a
+hosted room server. Localhost without an override still uses port 3008.
+The free Render server can take about a minute to wake after inactivity;
+the game retries the connection automatically.

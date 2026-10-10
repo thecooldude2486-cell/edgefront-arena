@@ -34,6 +34,8 @@ Online reliability:
 
 Rooms are kept in server memory; restarting the room server closes them. For hosted multiplayer, configure `VITE_MULTIPLAYER_URL` with a secure `wss://` server address. GitHub Pages alone cannot run the room server.
 
+The published Pages build uses `wss://edgefront-rooms.onrender.com` by default. The workflow preserves this address across future deployments; a repository `VITE_MULTIPLAYER_URL` variable can override it. See [deployment details](DEPLOYMENT.md).
+
 **Enable rooms on the live GitHub game:** [Deploy the free room server on Render](https://render.com/deploy?repo=https%3A%2F%2Fgithub.com%2Fthecooldude2486-cell%2Fedgefront-arena). The repository's `render.yaml` configures Node 24, a free Singapore web service, the GitHub Pages origin and `/health`. Sign in to Render, review the free plan and deploy. Once the service is live, use its actual `https://…onrender.com` address with the [hosted setup instructions](server/README.md#enable-live-rooms-with-render). Don't guess the address from the service name: Render can add a suffix. The frontend must then be rebuilt with its matching `wss://` address.
 
 Free Render services sleep after 15 minutes without traffic; the first connection can take about a minute to wake the service. Active rooms are lost on sleep, restart or redeploy. The setup creates no database or paid service. [Render free-service limits](https://render.com/docs/free).
