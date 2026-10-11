@@ -21,6 +21,7 @@ import { EMPTY_COSMETICS, rewardAt, type Cosmetics } from '@/game/progression';
 import { DIFFICULTY_ORB_REWARDS } from '@/game/createOrbRewards';
 import { DIFFICULTIES, type Difficulty } from '@/game/difficulty';
 import { LASER_ENERGY } from '@/game/createLaserEnergy';
+import { WEAPON_SLOTS, weaponSlot } from '@/game/loadoutCatalog';
 import { GRENADE } from '@/game/createGrenade';
 import {
   UZI_PRICE,
@@ -239,6 +240,7 @@ export function WeaponShop({
       );
   }
   const stats = WEAPON_DEFINITIONS[selected];
+  const selectedSlot = weaponSlot(selected);
   const cosmeticNames = Object.values(cosmetics)
     .filter((id): id is number => id !== null)
     .map((id) => rewardAt(id)?.name)
@@ -286,14 +288,32 @@ export function WeaponShop({
             : 'Browser saving unavailable — purchases require saving.'}
         </p>
         <DialogDescription className="shop-description">
-          Choose one primary: Kestrel AR, Meridian Sniper, Comet Launcher or
-          unlocked Helion. Vesper Pistol is always your secondary. Choose Vector
-          Sword or unlocked Orbiter for melee slot 3.
+          Browse all ten weapons by slot. Choose one primary, secondary, melee
+          and utility. Locked weapons show their price or unlock requirement.
         </DialogDescription>
         <output className="shop-loadout">
           Primary: <strong>{WEAPON_DEFINITIONS[primaryWeapon].name}</strong> ·
-          Secondary: <strong>Vesper Pistol</strong>
+          Secondary: <strong>{WEAPON_DEFINITIONS[secondaryWeapon].name}</strong>{' '}
+          · Melee: <strong>{WEAPON_DEFINITIONS[meleeWeapon].name}</strong> ·
+          Utility: <strong>{WEAPON_DEFINITIONS[utilityWeapon].name}</strong>
         </output>
+        {!revealing && (
+          <nav className="shop-slot-tabs" aria-label="Weapon slots">
+            {WEAPON_SLOTS.map((slot, index) => (
+              <button
+                type="button"
+                key={slot.name}
+                aria-pressed={selectedSlot === index}
+                onClick={() => {
+                  setSelected(slot.weapons[0]);
+                  setPurchaseError('');
+                }}
+              >
+                {slot.name} <span>{slot.weapons.length}</span>
+              </button>
+            ))}
+          </nav>
+        )}
         {revealing ? (
           <section
             className={`sniper-unlock ${revealing === 'orbiter' ? 'orbiter-reveal' : ''}`}
@@ -339,20 +359,7 @@ export function WeaponShop({
         ) : (
           <div className="shop-layout">
             <nav className="shop-list" aria-label="Shop weapons">
-              {(
-                [
-                  'assaultRifle',
-                  'sniper',
-                  'rocketLauncher',
-                  'laserCannon',
-                  'pistol',
-                  'uzi',
-                  'sword',
-                  'orbiter',
-                  'grenade',
-                  'molotov',
-                ] as const
-              ).map((id) => (
+              {WEAPON_SLOTS[selectedSlot].weapons.map((id) => (
                 <button
                   key={id}
                   type="button"

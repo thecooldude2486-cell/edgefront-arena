@@ -1,6 +1,7 @@
 'use client';
 
-import { RarityBadge } from './RarityBadge';
+import { LoadoutWeaponChoices } from './LoadoutWeaponChoices';
+import type { UnlockProgress } from '@/game/loadoutCatalog';
 import { useEffect, useRef, useState } from 'react';
 import type { OnlineGame } from '@/game/onlineMovement';
 import { WEAPON_DEFINITIONS, type WeaponId } from '@/game/weaponDefinitions';
@@ -12,6 +13,7 @@ export const SELECTION_SECONDS = 10;
 export type LoadoutChoices = {
   selected: WeaponId[];
   available: WeaponId[][];
+  unlockProgress?: UnlockProgress;
   choose: (id: WeaponId) => void;
 };
 export function LoadoutSelection({
@@ -142,29 +144,19 @@ export function LoadoutSelection({
             </button>
           ))}
         </div>
-        <div
-          className="loadout-choices"
-          role="group"
-          aria-label={labels[selected] + ' weapons'}
-        >
-          {loadout.available[selected].map((id) => (
-            <button
-              type="button"
-              key={id}
-              disabled={ready}
-              aria-pressed={loadout.selected[selected] === id}
-              onClick={() => loadout.choose(id)}
-            >
-              {WEAPON_DEFINITIONS[id].name}
-              <RarityBadge rarity={WEAPON_DEFINITIONS[id].rarity} />
-              <span>
-                {loadout.selected[selected] === id ? 'Equipped' : 'Select'}
-              </span>
-            </button>
-          ))}
-        </div>
+        <LoadoutWeaponChoices
+          slot={selected}
+          available={loadout.available[selected]}
+          equipped={loadout.selected[selected]}
+          ready={ready}
+          progress={loadout.unlockProgress}
+          onChoose={loadout.choose}
+        />
         <div className="loadout-selection-footer">
-          <p>Unlocked weapons only. No time limit until you are ready.</p>
+          <p>
+            All weapons are listed. Unlock locked gear in the lobby Armory. No
+            time limit until you are ready.
+          </p>
           <button
             type="button"
             className="primary-button"

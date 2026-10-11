@@ -121,6 +121,11 @@
   .shop-orbs:active { background: #235568; }
 }
 .weapon-shop .shop-description { color: var(--muted); font-size: 16px; }
+.shop-slot-tabs { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; }
+.shop-slot-tabs button { display:flex; align-items:center; justify-content:center; gap:10px; padding:10px 8px; border:1px solid var(--line); border-radius:6px; background:#0c2330; color:var(--muted); font:700 12px/1.4 monospace; cursor:pointer; }
+.shop-slot-tabs button span { border:1px solid #466777; border-radius:4px; padding:1px 5px; font-size:10px; }
+.shop-slot-tabs button:hover,.shop-slot-tabs button[aria-pressed=true] { border-color:var(--cyan); color:var(--cyan); background:#153544; }
+@media(max-width:460px) { .shop-slot-tabs { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 .shop-layout { display: grid; grid-template-columns: 200px minmax(0, 1fr) 230px; gap: 20px; }
 .shop-list { display: flex; flex-direction: column; gap: 12px; }
 .shop-item { text-align: left; padding: 18px; border: 1px solid var(--line); border-radius: 9px; background: linear-gradient(130deg, #1b3444, #08131f); color: var(--ink); cursor: pointer; transition: transform 150ms ease, border-color 150ms ease, background 150ms ease; }
@@ -147,7 +152,7 @@
 .weapon-shop button:focus-visible, .shop-open-button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; }
 @media (max-width: 1000px) {
   .shop-layout { grid-template-columns: minmax(0, 1fr) 220px; }
-  .shop-list { grid-column: 1 / -1; flex-direction: row; }
+  .shop-list { grid-column: 1 / -1; flex-direction: row; flex-wrap:wrap; }
   .shop-item { flex: 1; }
 }
 @media (max-width: 620px) {

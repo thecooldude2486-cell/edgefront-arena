@@ -413,6 +413,7 @@ export function GameShell() {
   }
   const loadoutChoices: LoadoutChoices = {
     selected: [primaryWeapon, secondaryWeapon, meleeWeapon, utilityWeapon],
+    unlockProgress: { laserPartsCount: hud.laserPartsCount, orbClicks },
     available: [
       [
         'assaultRifle',

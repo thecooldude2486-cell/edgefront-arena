@@ -42,6 +42,13 @@
 .loadout-choices button:hover,.loadout-choices button[aria-pressed=true] { border-color:#42e5ff; background:#153544; }
 .loadout-choices button[aria-pressed=true] span { color:#42e5ff; }
 .loadout-choices button:focus-visible { outline:2px solid #ecfbff; outline-offset:-4px; }
+.loadout-choices { border:0; margin:0; min-width:0; }
+.loadout-choices button { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:6px 10px; min-height:82px; }
+.loadout-choices button strong { line-height:1.4; overflow-wrap:anywhere; }
+.loadout-choices button > span:last-child { grid-column:1 / -1; line-height:1.5; }
+.loadout-choices button[data-locked=true] { opacity:1; border-style:dashed; color:#b0c6d0; background:#091c28; }
+.loadout-choices button[data-locked=true] > span:last-child { color:#bdad87; }
+.loadout-choices button[data-locked=true]:hover { border-color:#385563; background:#091c28; }
 .loadout-selection-footer { flex-shrink:0; margin-top:16px; }
 .loadout-countdown strong { font-size:32px; }
 .loadout-countdown-track { flex-shrink:0; margin-top:14px; }

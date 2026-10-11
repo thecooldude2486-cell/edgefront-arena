@@ -44,6 +44,8 @@ Run multiplayer checks with Node 24+: `node --test server/*.test.mjs`. Client re
 
 Local weapon testing: development builds on localhost automatically make paid shop weapons available. The secondary defaults to Vesper until you choose another weapon. No Orbs are spent and free ownership is never saved. Future paid weapons should use a boolean `*Owned` field in the wallet to join this preview automatically; purchase handlers should respect test mode. Production builds keep normal purchases, even when served locally. Quest/click unlocks remain unchanged.
 
+All ten weapons appear in the pre-match catalog, including locked gear. Primary lists Kestrel AR, Meridian Sniper, Comet Launcher and Helion; Utility lists Pulse Grenade and Ember Molotov. Locked cards show the Orb price or current part/click requirement. Buy or unlock them in the lobby Armory to equip them. The Armory groups weapons into four slot categories with counts, so utilities and later primaries remain easy to find. Browser saves belong to their website origin: localhost unlocks do not transfer automatically to GitHub Pages.
+
 You need Node.js 22.13 or newer. Then open Terminal in this folder and run:
 
 ```bash
