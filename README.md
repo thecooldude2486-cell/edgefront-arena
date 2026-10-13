@@ -16,6 +16,10 @@ use **Resume** to capture the cursor again.
 
 Both bot and online matches show each team's individual players. Finished
 matches show final scores and replay/lobby actions after the last death recap.
+After elimination, spectating continues even with the cursor released. Living
+teammates keep fighting in team modes; surviving bots patrol without shooting
+during the round break, including 1v1. Online spectating follows surviving
+teammates during play and allows the winning side after the round ends.
 
 On this Mac, double-click **Start Edgefront Arena.command** in the project folder.
 It starts the game on http://localhost:3000/ and online rooms on port 3008.
@@ -34,7 +38,10 @@ Online reliability:
 
 Rooms are kept in server memory; restarting the room server closes them. For hosted multiplayer, configure `VITE_MULTIPLAYER_URL` with a secure `wss://` server address. GitHub Pages alone cannot run the room server.
 
-The published Pages build uses `wss://edgefront-rooms.onrender.com` by default. The workflow preserves this address across future deployments; a repository `VITE_MULTIPLAYER_URL` variable can override it. See [deployment details](DEPLOYMENT.md).
+The published Pages build uses `wss://edgefront-rooms.onrender.com` by default.
+Opening Online retries for up to two minutes so the free server can wake up;
+stalled connection handshakes are retried automatically. Existing rooms keep
+their 30-second reconnect window. The workflow preserves this address across future deployments; a repository `VITE_MULTIPLAYER_URL` variable can override it. See [deployment details](DEPLOYMENT.md).
 
 **Enable rooms on the live GitHub game:** [Deploy the free room server on Render](https://render.com/deploy?repo=https%3A%2F%2Fgithub.com%2Fthecooldude2486-cell%2Fedgefront-arena). The repository's `render.yaml` configures Node 24, a free Singapore web service, the GitHub Pages origin and `/health`. Sign in to Render, review the free plan and deploy. Once the service is live, use its actual `https://…onrender.com` address with the [hosted setup instructions](server/README.md#enable-live-rooms-with-render). Don't guess the address from the service name: Render can add a suffix. The frontend must then be rebuilt with its matching `wss://` address.
 

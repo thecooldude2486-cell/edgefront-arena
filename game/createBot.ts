@@ -358,11 +358,12 @@ export function createBot(
       patrolPoints = points.map(([x, z]) => new Vector3(x, SPAWNS.bot.y, z));
       patrolIndex = 0;
     },
-    update(deltaSeconds: number, now: number) {
+    update(deltaSeconds: number, now: number, combatEnabled = true) {
       if (!alive) return;
       const difficulty = DIFFICULTIES[getDifficulty()];
       alertSeconds = Math.max(0, alertSeconds - deltaSeconds);
       const alerted =
+        combatEnabled &&
         retaliates() &&
         alertSeconds > 0 &&
         attackerPosition !== null &&
@@ -382,6 +383,7 @@ export function createBot(
       flatToPlayer.y = 0;
       const distance = flatToPlayer.length();
       const canSeePlayer =
+        combatEnabled &&
         targetAlive() &&
         (distance < 27 || alerted) &&
         hasLineOfSight(playerPosition);
@@ -427,7 +429,7 @@ export function createBot(
         moveDirection = toPatrol.normalize();
       }
 
-      if (teamPlan) moveDirection = teamPlan.movement;
+      if (combatEnabled && teamPlan) moveDirection = teamPlan.movement;
       if (moveDirection.lengthSquared() > 0.001) {
         const speed = canSeePlayer
           ? difficulty.moveSpeed

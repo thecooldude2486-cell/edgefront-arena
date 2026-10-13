@@ -1,3 +1,4 @@
+import { botSimulationPhase } from './botSimulation';
 import { createSpectator, type SpectatorActor } from './createSpectator';
 import { getGamePreferences, subscribeGamePreferences, applyViewPreferences } from './gamePreferences';
 import { isGameUiInput } from './gameUiInput';
@@ -964,13 +965,22 @@ export function createGame(
     characterHands.root.setEnabled(!inLobby && matchActive && playerAlive && !characterScoped);
     if (onlinePlayer) { grenades.update(deltaSeconds); molotovs.update(deltaSeconds); rockets.update(deltaSeconds); onlineTracers.update(deltaSeconds); }
     grapple.draw();
-    if (!onlinePlayer && !inLobby && matchActive && !gameOver && !teamIntermission && (document.pointerLockElement === canvas||botTeamSize>1&&!playerAlive)) {
-      grenades.update(deltaSeconds); molotovs.update(deltaSeconds);
-      arena.cover.update(deltaSeconds);
-      rockets.update(deltaSeconds);
-      if(botTeamSize>1)updateTeamBots(deltaSeconds,now);else bot.update(deltaSeconds, now);
-      if(bot.alive&&bot.root.position.y<FALL_DEATH_Y)bot.takeHazardDamage(100);
-      captureReplay();
+    // Spectating releases pointer lock. Continue the simulation after elimination;
+    // surviving bots patrol without attacking during the round break.
+    const botPhase = botSimulationPhase(document.pointerLockElement === canvas,
+      spectator.active, playerAlive, botTeamSize, teamIntermission);
+    if (!onlinePlayer && !inLobby && matchActive && !gameOver && botPhase !== 'paused') {
+      if (botPhase === 'patrol') {
+        for (const survivor of [bot, ...teamUnits.map(u => u.bot)])
+          survivor.update(deltaSeconds, now, false);
+      } else {
+        grenades.update(deltaSeconds); molotovs.update(deltaSeconds);
+        arena.cover.update(deltaSeconds);
+        rockets.update(deltaSeconds);
+        if(botTeamSize>1)updateTeamBots(deltaSeconds,now);else bot.update(deltaSeconds, now);
+        if(bot.alive&&bot.root.position.y<FALL_DEATH_Y)bot.takeHazardDamage(100);
+        captureReplay();
+      }
     }
 
     spectator.update(frameSeconds);

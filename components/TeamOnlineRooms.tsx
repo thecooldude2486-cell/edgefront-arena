@@ -109,6 +109,7 @@ export function TeamOnlineRooms({
   useEffect(() => {
     let stopped = false,
       retry: ReturnType<typeof setTimeout> | null = null,
+      connectTimeout: ReturnType<typeof setTimeout> | null = null,
       lastReceived = Date.now(),
       disconnectedAt = 0,
       attempt = 0;
@@ -143,7 +144,12 @@ export function TeamOnlineRooms({
         return;
       }
       socket.current = ws;
+      // Do not leave a stalled handshake waiting indefinitely.
+      connectTimeout = setTimeout(() => {
+        if (ws.readyState === WebSocket.CONNECTING) ws.close();
+      }, 15000);
       ws.onopen = () => {
+        if (connectTimeout) clearTimeout(connectTimeout);
         attempt = 0;
         disconnectedAt = 0;
         setConnected(true);
@@ -316,6 +322,7 @@ export function TeamOnlineRooms({
         }
       };
       ws.onclose = () => {
+        if (connectTimeout) clearTimeout(connectTimeout);
         if (stopped) return;
         setConnected(false);
         setNetworkStatus('reconnecting');
@@ -323,11 +330,16 @@ export function TeamOnlineRooms({
         needsResume.current = true;
         game?.setOnlineNetworkPaused(true);
         if (!disconnectedAt) disconnectedAt = Date.now();
-        if (Date.now() - disconnectedAt < 30000)
+        // Hosted free servers need time to wake; an existing match still has
+        // the server's 30-second reconnect window.
+        const retryWindow = roomRef.current ? 30000 : 120000;
+        if (Date.now() - disconnectedAt < retryWindow)
           retry = setTimeout(connect, Math.min(3000, 500 * 2 ** attempt++));
         else {
           setNetworkStatus('unavailable');
-          setError('Reconnect timed out. Leave and join a room again.');
+          setError(roomRef.current
+            ? 'Reconnect timed out. Leave and join a room again.'
+            : 'The room server did not wake up. Reopen Online to try again.');
         }
       };
       ws.onerror = () => ws.close();
@@ -352,6 +364,7 @@ export function TeamOnlineRooms({
     return () => {
       stopped = true;
       if (retry) clearTimeout(retry);
+      if (connectTimeout) clearTimeout(connectTimeout);
       clearInterval(timer);
       send({ type: 'teamLeave' });
       try {

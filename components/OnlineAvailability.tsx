@@ -20,8 +20,8 @@ export function OnlineAvailability({
           : status === 'connected'
             ? 'Room server connected. Create a room or join your friends.'
             : status === 'reconnecting'
-              ? 'Reconnecting to the room server…'
-              : 'Connecting to the room server…'}
+              ? 'Reconnecting to the room server… A sleeping server can take up to two minutes to start.'
+              : 'Connecting to the room server… A sleeping server can take up to two minutes to start.'}
       </output>
       {status === 'unavailable' && (
         <button className="polish-button emphasized" onClick={onBots}>
